@@ -15,6 +15,12 @@ class Bond:
         self.el2 = el2
         self.length = float(length)
 
+    def __lt__(self, other):
+        return self.length < other.length
+    
+    def __eq__(self, other):
+        return self.length == other.lenght
+
     def get_normalized_element_names(self):
         """
         :return: tuple of the normalized element names
@@ -128,10 +134,10 @@ def get_bonds(driver, shelx_file):
 
     with open(driver.cif_file) as f:
         file_txt = f.read()
-        cif_file = CifParser.from_string(file_txt)
+        cif_file = CifParser.from_str(file_txt)
 
-    cif_dict = cif_file.as_dict().values()[0]
+    cif_dict = list(cif_file.as_dict().values())[0]
     bond_tuples = zip(cif_dict["_geom_bond_atom_site_label_1"], cif_dict["_geom_bond_atom_site_label_2"],
                       [float(x.replace("(", "").replace(")", "")) for x in cif_dict["_geom_bond_distance"]])
 
-    return map(lambda tup: Bond(tup[0], tup[1], tup[2]), bond_tuples)
+    return list(map(lambda tup: Bond(tup[0], tup[1], tup[2]), bond_tuples))

@@ -56,7 +56,7 @@ class SHELXDriver:
         """
         with open(self.ins_file, 'w') as f:
             f.write(ins_file_obj.to_string())
-        output = self.run_SHELXTL_command(cmd=cmd)
+        output = str(self.run_SHELXTL_command(cmd=cmd))
         recognized_errors = ["** Cell contents from UNIT instruction and atom list do not agree **",
                              "** Extinction (EXTI) or solvent water (SWAT) correction may be required **"]
         if "** Absolute structure probably wrong - invert and repeat refinement **" in output:

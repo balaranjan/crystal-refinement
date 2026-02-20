@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from pymatgen import Composition
+from pymatgen.core import Composition
 import crystal_refinement.utils.bond_utils as bond_utils
 import math
 

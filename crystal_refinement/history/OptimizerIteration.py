@@ -294,7 +294,6 @@ class OptimizerIteration:
 
         for criterion in criteria:
             sorted_by_criteria.append(sorted(self.get_leaves(), key=lambda iteration: iteration.get_score(criterion)))
-
         # interleave sorted lists
         sorted_leaves_with_duplicates = list(chain(*zip(*sorted_by_criteria)))
 

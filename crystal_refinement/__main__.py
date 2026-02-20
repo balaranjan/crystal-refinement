@@ -6,7 +6,7 @@ from crystal_refinement.Optimizer import Optimizer
 
 def parse_config(config_file):
     with open(config_file) as f:
-        config = yaml.load(f)
+        config = yaml.load(f, yaml.loader.FullLoader)
 
         # SHELX Config section
         xl_path = config.get("path_to_xl")

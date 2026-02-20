@@ -24,6 +24,9 @@ class CrystalSite:
         self.element = None  # This is the integer that refers to the element type in this location
         self.read_line(line_list)
 
+    def __str__(self):
+        return f"{self.el_string} {self.element} {self.position} {self.occupancy} {self.displacement}"
+
     def read_line(self, line_list):
         """
         Takes in a list of strings from the input file and sets the data members

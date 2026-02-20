@@ -147,9 +147,14 @@ class Optimizer:
 
         # Optimization
         self.run_step(OptimizerSteps.identify_sites)
+        
         self.run_step(OptimizerSteps.switch_elements)
+        self.run_step(OptimizerSteps.try_remove_sites_based_on_displacement)
+        # exit(0)
         self.history.clean_history()
         self.run_step(OptimizerSteps.change_occupancy)
+        # self.run_step(OptimizerSteps.try_remove_sites_based_on_displacement)
+        # exit(0)
         self.run_step(OptimizerSteps.try_exti)
         self.run_step(OptimizerSteps.try_anisotropy)
         pre_weight_leaves = self.history.get_leaves()

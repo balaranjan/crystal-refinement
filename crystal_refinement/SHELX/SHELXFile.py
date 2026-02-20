@@ -3,7 +3,7 @@ import re
 
 from itertools import groupby
 from crystal_refinement.SHELX.SHELXElement import SHELXElement
-from pymatgen import Composition
+from pymatgen.core import Composition
 
 from crystal_refinement.SHELX.CrystalSite import CrystalSite
 

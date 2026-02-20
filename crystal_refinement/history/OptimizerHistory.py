@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from crystal_refinement.history.OptimizerIteration import OptimizerIteration
 from crystal_refinement.utils.bond_utils import get_bonds
+from traceback import format_exc
 
 
 class OptimizerHistory:
@@ -44,6 +45,7 @@ class OptimizerHistory:
                                                               annotation=annotation)
         # This throws a FileNotFound error in python3, let's just try catching everything for now...
         except:
+            print(format_exc())
             return None
 
         return new_iter

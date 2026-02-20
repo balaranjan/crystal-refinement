@@ -1,3 +1,4 @@
 # SHELX Config
-path_to_xl: path/to/xl.exe
-path_to_xs: path/to/xs.exe
+path_to_xl: xl
+path_to_xs: xs
+log_output: True

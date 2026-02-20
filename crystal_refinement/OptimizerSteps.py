@@ -156,6 +156,43 @@ def try_remove_site(initial, optimizer):
         threshold *= 1.1
 
 
+def try_remove_sites_based_on_displacement(initial, optimizer):
+    """
+    Remove sites with higher displacement than the rest
+    """
+
+    ins_file = initial.res_file
+
+    sorted_sites = sorted(ins_file.get_unmixed_sites(), key=lambda site: -site.displacement)
+    displacements_list = list(map(lambda site: site.displacement, ins_file.get_all_sites()))
+    for original_site in sorted_sites:
+        for prev_iter in initial.get_leaves():
+            new_ins = prev_iter.get_res_copy()
+            site_displacement = original_site.displacement
+            filtered_displacements = list(filter(lambda d: d != site_displacement, displacements_list)) # remove displacement of current site
+            mean = np.mean(filtered_displacements)
+            std = np.std(filtered_displacements)
+
+            # if optimizer.log_output:
+            #     print("Site val {} {}  ".format(original_site.get_name(), abs(site_displacement - mean) / std))
+
+            if abs(site_displacement - mean) / std < 2.0:
+                break
+
+            for site in new_ins.get_sites_by_index(original_site.site_number):
+                new_ins.remove_site(site)
+            iteration = optimizer.history.run_iter(new_ins, initial, "Removed {} site due to high displacement".format(original_site.get_name()))
+            # If removing site decreased r1, decreased the displacement, add it to the history
+            if iteration is not None:
+                # new_site = iteration.res_file.get_sites_by_index(original_site.site_number)[0]
+                if iteration.r1 < prev_iter.r1:
+                    optimizer.history.save(iteration)
+                    if optimizer.log_output:
+                        print("Removed {} site due to high displacement".format(original_site.get_name()))
+
+    # print(ins_file.filetxt)
+
+
 def switch_elements(initial, optimizer):
     """
     Switch elements to find the correct elemental site assignments.
@@ -200,13 +237,13 @@ def change_occupancy(initial, optimizer):
     ins_file = initial.res_file
     # Want to make changes from largest displacement to smallest, but only in unmixed sites
     sorted_sites = sorted(ins_file.get_unmixed_sites(), key=lambda site: -site.displacement)
-    displacements_list = map(lambda site: site.displacement, ins_file.get_all_sites())
+    displacements_list = list(map(lambda site: site.displacement, ins_file.get_all_sites()))
     for original_site in sorted_sites:
         for prev_iter in initial.get_leaves():
             new_ins = prev_iter.get_res_copy()
             # only change occupancy if displacement is >= 2 std deviations away from mean
             site_displacement = original_site.displacement
-            filtered_displacements = filter(lambda d: d != site_displacement, displacements_list) # remove displacement of current site
+            filtered_displacements = list(filter(lambda d: d != site_displacement, displacements_list)) # remove displacement of current site
             mean = np.mean(filtered_displacements)
             std = np.std(filtered_displacements)
             if abs(site_displacement - mean) / std < 2.0:
@@ -254,7 +291,7 @@ def _do_site_mixing(initial, tried, pairs, optimizer):
     bonds = bond_utils.get_bonds(optimizer.driver, ins_file)
 
     site_bond_scores = bond_utils.get_site_bond_scores(bonds, optimizer.cache, ins_file, n_bonds=2)
-    mixing_priority = map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), site_bond_scores)
+    mixing_priority = list(map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), site_bond_scores))
 
     # In case of ties, find all top tied priorities
     top_priority_score = mixing_priority[0][1]

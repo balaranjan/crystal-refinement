@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from pymatgen import Element
+from pymatgen.core.periodic_table import Element
 
 class SHELXElement:
     """
