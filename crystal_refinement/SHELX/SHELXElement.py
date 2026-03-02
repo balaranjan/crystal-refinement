@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from pymatgen.core.periodic_table import Element
+from crystal_refinement.utils.composition_utils import Element
 
 class SHELXElement:
     """
@@ -9,6 +9,9 @@ class SHELXElement:
         self.name = name
         self.nominal_stoichiometry = stoichiometry
         self.index = index
+
+    def __str__(self):
+        return f"{self.name} {self.index} {self.nominal_stoichiometry}"
 
     def get_name(self, capitalize=False):
         """
@@ -21,9 +24,11 @@ class SHELXElement:
         else:
             return self.name
 
-    def get_pymatgen_element(self):
+    def get_element(self):
         """
         Get a pymatget element object that corresponds to this element
         :return:
         """
-        return Element(self.get_name(True))
+        return Element(self.get_name(False))
+    
+

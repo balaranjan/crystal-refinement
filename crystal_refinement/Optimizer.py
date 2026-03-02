@@ -11,6 +11,7 @@ try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
+import traceback
 
 
 class Optimizer:
@@ -143,32 +144,41 @@ class Optimizer:
                                     self.use_ml_model,
                                     self.citrination_api_key)
 
-        self.history = OptimizerHistory(self.driver, self.cache, ins_file, self.score_weighting, self.max_n_leaves)
+        
+        initial_loading_ok, i_try = False, 0
+        missing_elements = ins_file.get_missing_elements()
+        while ((not initial_loading_ok) or len(missing_elements)) and i_try < 10:
+            try:
+                ins_file.add_missing_elements()
+                missing_elements = ins_file.get_missing_elements()
+                self.history = OptimizerHistory(self.driver, self.cache, ins_file, self.score_weighting, self.max_n_leaves)
+                initial_loading_ok = True
+            except:
+                pass
+            i_try += 1
 
         # Optimization
         self.run_step(OptimizerSteps.identify_sites)
         
         self.run_step(OptimizerSteps.switch_elements)
         self.run_step(OptimizerSteps.try_remove_sites_based_on_displacement)
-        # exit(0)
         self.history.clean_history()
         self.run_step(OptimizerSteps.change_occupancy)
-        # self.run_step(OptimizerSteps.try_remove_sites_based_on_displacement)
-        # exit(0)
         self.run_step(OptimizerSteps.try_exti)
-        self.run_step(OptimizerSteps.try_anisotropy)
+        self.run_step(OptimizerSteps.try_site_mixing)
+        
         pre_weight_leaves = self.history.get_leaves()
+        self.run_step(OptimizerSteps.try_anisotropy)
         self.run_step(OptimizerSteps.use_suggested_weights)
-        self.run_step(OptimizerSteps.use_suggested_weights)
+        # self.run_step(OptimizerSteps.use_suggested_weights)
 
         for pre_weight_leaf in pre_weight_leaves:
             self.history.clean_history(1, pre_weight_leaf)
 
-        self.run_step(OptimizerSteps.try_site_mixing)
         self.history.clean_history(criteria=["overall_score", "r1_only"])
 
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
-        print("Done with optimization")
+        
         results_path = os.path.join(self.input_directory, "optimizer_results")
         if not os.path.exists(results_path):
             os.mkdir(results_path)

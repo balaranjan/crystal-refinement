@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from pymatgen.core import Composition
+
 import crystal_refinement.utils.bond_utils as bond_utils
 import math
 
@@ -31,7 +31,7 @@ def get_stoichiometry_score(shelx_file, cache):
     :return: stoichiometry agreement score
     """
 
-    analytic_formula = Composition(shelx_file.get_analytic_formula())
+    analytic_formula = shelx_file.get_analytic_formula()
     score = 0.0
 
     for el in cache.element_list:

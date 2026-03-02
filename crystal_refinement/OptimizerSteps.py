@@ -86,7 +86,7 @@ def try_add_q(initial, optimizer):
     Try adding q peaks to main crystal sites if it decreases R value
     """
     base_ins = initial.get_res_copy()
-    lightest_element = min([el.get_pymatgen_element().number for el in base_ins.elements])
+    lightest_element = min([el.get_element().number for el in base_ins.elements])
     if base_ins.q_peaks[0].electron_density > lightest_element:
         annotation = "Added q peak {}".format(base_ins.q_peaks[0].to_string())
         base_ins.move_q_to_crystal()
@@ -170,25 +170,29 @@ def try_remove_sites_based_on_displacement(initial, optimizer):
             new_ins = prev_iter.get_res_copy()
             site_displacement = original_site.displacement
             filtered_displacements = list(filter(lambda d: d != site_displacement, displacements_list)) # remove displacement of current site
-            mean = np.mean(filtered_displacements)
-            std = np.std(filtered_displacements)
+            if len(filtered_displacements):
+                mean = np.mean(filtered_displacements)
+                std = np.std(filtered_displacements)
 
-            # if optimizer.log_output:
-            #     print("Site val {} {}  ".format(original_site.get_name(), abs(site_displacement - mean) / std))
+                # if optimizer.log_output:
+                #     print("Site val {} {}  ".format(original_site.get_name(), abs(site_displacement - mean) / std))
+                if std == 0.0: std = 1.0e-3
+                if abs(site_displacement - mean) / std < 2.0:
+                    break
+            
+            site_to_remove = list(new_ins.get_sites_by_index(original_site.site_number))[0]
 
-            if abs(site_displacement - mean) / std < 2.0:
-                break
+            if site_to_remove != "N":
+                new_ins.remove_site(site_to_remove)
 
-            for site in new_ins.get_sites_by_index(original_site.site_number):
-                new_ins.remove_site(site)
-            iteration = optimizer.history.run_iter(new_ins, initial, "Removed {} site due to high displacement".format(original_site.get_name()))
-            # If removing site decreased r1, decreased the displacement, add it to the history
-            if iteration is not None:
-                # new_site = iteration.res_file.get_sites_by_index(original_site.site_number)[0]
-                if iteration.r1 < prev_iter.r1:
-                    optimizer.history.save(iteration)
-                    if optimizer.log_output:
-                        print("Removed {} site due to high displacement".format(original_site.get_name()))
+                iteration = optimizer.history.run_iter(new_ins, initial, "Removed {} site due to high displacement".format(original_site.get_name()))
+                # If removing site decreased r1, decreased the displacement, add it to the history
+                if iteration is not None:
+                    # new_site = iteration.res_file.get_sites_by_index(original_site.site_number)[0]
+                    if iteration.r1 < prev_iter.r1:
+                        optimizer.history.save(iteration)
+                        if optimizer.log_output:
+                            print("Removed {} site due to high displacement".format(original_site.get_name()))
 
     # print(ins_file.filetxt)
 
@@ -215,6 +219,7 @@ def switch_elements(initial, optimizer):
                 annotation = "Changed {} to {}".format(prev, cur)
                 if optimizer.log_output:
                     print("Trying step: {}".format(annotation))
+                new_ins.add_missing_elements()
                 iteration = optimizer.history.run_iter(new_ins, prev_iter, annotation)
 
                 # If the iteration didn't fail, save it
@@ -244,10 +249,13 @@ def change_occupancy(initial, optimizer):
             # only change occupancy if displacement is >= 2 std deviations away from mean
             site_displacement = original_site.displacement
             filtered_displacements = list(filter(lambda d: d != site_displacement, displacements_list)) # remove displacement of current site
-            mean = np.mean(filtered_displacements)
-            std = np.std(filtered_displacements)
-            if abs(site_displacement - mean) / std < 2.0:
-                break
+            if len(filtered_displacements):
+                mean = np.mean(filtered_displacements)
+                std = np.std(filtered_displacements)
+
+                if std == 0: std = 1.0
+                if abs(site_displacement - mean) / std < 2.0:
+                    break
 
             for site in new_ins.get_sites_by_index(original_site.site_number):
                 new_ins.add_variable_occupancy(site)
@@ -291,12 +299,11 @@ def _do_site_mixing(initial, tried, pairs, optimizer):
     bonds = bond_utils.get_bonds(optimizer.driver, ins_file)
 
     site_bond_scores = bond_utils.get_site_bond_scores(bonds, optimizer.cache, ins_file, n_bonds=2)
-    mixing_priority = list(map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), site_bond_scores))
+    mixing_priority = list(map(lambda tup: (int(re.search(r"\d+", tup[0]).group(0)), tup[1]), site_bond_scores))
 
     # In case of ties, find all top tied priorities
     top_priority_score = mixing_priority[0][1]
     top_priority = [priority[0] for priority in mixing_priority if priority[1] - top_priority_score < 0.5]
-
     # Check if we have tried mixing on all the top priority sites already. If so, stop recursion.
     if all([i in tried for i in top_priority]):
         if optimizer.ensure_identified_elements:
@@ -312,35 +319,43 @@ def _do_site_mixing(initial, tried, pairs, optimizer):
             iterations = []
 
             # Try all the mixing pairs on the selected site
-            for pair in pairs:
-                new_ins = prev_iter.get_res_copy()
+            pairs_with_element_i = [pair for pair in pairs 
+                                    if i in [pair[0].index, pair[1].index]]
+            
+            if not len(pairs_with_element_i):
+                continue
+            selected_pair = sorted(pairs_with_element_i, 
+                                   key=lambda pair: pair[-1], reverse=True)[0]
+            # for pair in pairs:
+            pair = selected_pair[:2]
+            new_ins = prev_iter.get_res_copy()
 
-                # Start with equal mixing on the site
-                new_ins.add_equal_site_mixing(i, pair)
-                annotation = "Mixing {} and {} on site {} equally".format(pair[0].get_name(), pair[1].get_name(), i)
+            # Start with equal mixing on the site
+            new_ins.add_equal_site_mixing(i, pair)
+            annotation = "Mixing {} and {} on site {} equally".format(pair[0].get_name(), pair[1].get_name(), i)
+            if optimizer.log_output:
+                print("Trying step: {}".format(annotation))
+            iteration = optimizer.history.run_iter(new_ins, prev_iter, annotation)
+
+            # Check if the equal mixing was successful based on validity and r1 score
+            if iteration is not None and iteration.r1 - prev_iter.r1 < optimizer.r1_similarity_threshold:
+                optimizer.history.save(iteration)
+                if prev_iter.r1 - iteration.r1 < optimizer.r1_similarity_threshold:
+                    prev_iter.propagate()
+                new_ins = iteration.get_res_copy()
+
+                # Try allowing the mixing ratio to be variable
+                new_ins.add_site_mixing_variable_occupancy(i)
+                annotation = "Adding variable occupancy for {} and {} on site {}".format(pair[0].get_name(), pair[1].get_name(), i)
                 if optimizer.log_output:
                     print("Trying step: {}".format(annotation))
-                iteration = optimizer.history.run_iter(new_ins, prev_iter, annotation)
+                variable_occupancy_iteration = optimizer.history.run_iter(new_ins, iteration, annotation)
 
-                # Check if the equal mixing was successful based on validity and r1 score
-                if iteration is not None and iteration.r1 - prev_iter.r1 < optimizer.r1_similarity_threshold:
-                    optimizer.history.save(iteration)
-                    if prev_iter.r1 - iteration.r1 < optimizer.r1_similarity_threshold:
-                        prev_iter.propagate()
-                    new_ins = iteration.get_res_copy()
-
-                    # Try allowing the mixing ratio to be variable
-                    new_ins.add_site_mixing_variable_occupancy(i)
-                    annotation = "Adding variable occupancy for {} and {} on site {}".format(pair[0].get_name(), pair[1].get_name(), i)
-                    if optimizer.log_output:
-                        print("Trying step: {}".format(annotation))
-                    variable_occupancy_iteration = optimizer.history.run_iter(new_ins, iteration, annotation)
-
-                    # Check if the variable mixing ratio was successful
-                    if variable_occupancy_iteration is not None:
-                        occupancy_var = float(variable_occupancy_iteration.get_res_copy().fvar_vals[-1])
-                        if occupancy_var > optimizer.occupancy_threshold and occupancy_var < (1 - optimizer.occupancy_threshold):
-                            iterations.append(variable_occupancy_iteration)
+                # Check if the variable mixing ratio was successful
+                if variable_occupancy_iteration is not None:
+                    occupancy_var = float(variable_occupancy_iteration.get_res_copy().fvar_vals[-1])
+                    if occupancy_var > optimizer.occupancy_threshold and occupancy_var < (1 - optimizer.occupancy_threshold):
+                        iterations.append(variable_occupancy_iteration)
 
             # If no element pairs were successful, move on
             if len(iterations) == 0:
@@ -378,8 +393,8 @@ def try_anisotropy(initial, optimizer):
 
     if iteration is not None:
         optimizer.history.save(iteration)
-        if iteration.r1 > initial.r1:
-            initial.propagate()
+        # if iteration.r1 > initial.r1:
+        #     initial.propagate()
 
 
 def try_exti(initial, optimizer):

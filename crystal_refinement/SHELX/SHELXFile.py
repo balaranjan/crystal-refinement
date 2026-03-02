@@ -3,9 +3,10 @@ import re
 
 from itertools import groupby
 from crystal_refinement.SHELX.SHELXElement import SHELXElement
-from pymatgen.core import Composition
+from crystal_refinement.utils.composition_utils import Composition
 
 from crystal_refinement.SHELX.CrystalSite import CrystalSite
+import traceback
 
 
 class SHELXFile:
@@ -35,6 +36,40 @@ class SHELXFile:
         self.r1 = 0.0
         self.suggested_weight_vals = ""
         self.read(filetxt)
+
+    def get_missing_elements(self):
+        # all_elements = set([f"{element.name}-{element.index}" for element in self.elements])
+        all_elements = {element.index: element for element in self.elements}
+        available_elements = set()
+        for site in self._crystal_sites:
+            available_elements.add(site.element)
+
+        missing_elements = set(all_elements.keys()) - available_elements
+        missing_elements = [all_elements[element_index] for element_index in missing_elements]
+
+        return missing_elements
+    
+
+    def add_missing_elements(self):
+        
+        lightest_element = min([el.get_element().number for el in self.elements])
+        missing_elements = self.get_missing_elements()
+
+        i_try = 0
+        while len(missing_elements) and i_try < 10:
+
+            if self.q_peaks[0].electron_density > lightest_element:
+                self.move_q_to_crystal()
+                # switch element to missing
+                sorted_sites = [site for site in self.get_all_sites() if site.el_string.startswith("Q")][0]
+                new_site = self.get_sites_by_index(sorted_sites.site_number)[0]
+                if len(missing_elements):
+                    new_site.switch_element(missing_elements[0])
+                i_try += 1
+                missing_elements = self.get_missing_elements()
+            else:
+                return
+
 
     def read(self, filetxt):
         """
@@ -333,7 +368,7 @@ class SHELXFile:
         return self._crystal_sites
 
     def get_sites_by_index(self, index):
-        return self._crystal_sites_by_index[index]
+        return self._crystal_sites_by_index.get(index, "NA")
 
     def get_mixed_site_indices(self):
         return self._mixed_site_indices

@@ -45,7 +45,6 @@ class OptimizerHistory:
                                                               annotation=annotation)
         # This throws a FileNotFound error in python3, let's just try catching everything for now...
         except:
-            print(format_exc())
             return None
 
         return new_iter
@@ -110,3 +109,4 @@ class OptimizerHistory:
         :return:
         """
         self.head.generate_graph(output_file)
+        self.head.generate_graph(output_file + "_selected", selected_only=True)

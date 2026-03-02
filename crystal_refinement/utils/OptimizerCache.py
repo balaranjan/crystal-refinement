@@ -1,14 +1,9 @@
 from __future__ import absolute_import
 import itertools
-from pymatgen.core.periodic_table import Element
-# try:
-#     from pymatgen.analysis.structure_prediction.substitution_probability import SubstitutionProbability
-# except ImportError:
-#     from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
-from pymatgen.analysis.structure_prediction.substitution_probability import SubstitutionProbability
-
+from crystal_refinement.SHELX.SHELXElement import Element
 from citrination_client import CitrinationClient
 from crystal_refinement.utils.bond_utils import Bond
+from crystal_refinement.utils.mixing_prob import mixing_probs
 
 
 class OptimizerCache:
@@ -47,10 +42,11 @@ class OptimizerCache:
             self.mixing_pairs = self.get_mixing_pairs(probability_threshold=2E-4)
         else:
             self.mixing_pairs = []
-            for el1, el2 in mixing_pairs:
+            for el1, el2, score in mixing_pairs:
                 try:
                     self.mixing_pairs.append([shelx_file.get_element_by_name(el1),
-                                              shelx_file.get_element_by_name(el2)])
+                                              shelx_file.get_element_by_name(el2),
+                                              score])
                 except KeyError:
                     "User defined mixing elements {} and {} must be elements specified in the ins file".format(el1, el2)
 
@@ -145,11 +141,11 @@ class OptimizerCache:
         # For all elements in compound, calculate substitution probabilities
         # If substitution probability is > probability_threshold, then save it to pairs list.
         for e1, e2 in itertools.combinations(self.element_list, 2):
-            sp = self.get_substitution_probability(e1.get_pymatgen_element(), e2.get_pymatgen_element())
+            sp = self.get_substitution_probability(e1.get_element(), e2.get_element())
             if sp > probability_threshold:
-                pairs.append(([e1, e2], sp))
+                pairs.append((e1, e2, sp))
         # Sort pairs by substitution probability (largest to smallest)
-        return [tup[0] for tup in sorted(pairs, key=lambda tup: -tup[1])]
+        return [tup for tup in sorted(pairs, key=lambda tup: -tup[-1])]
 
     def get_substitution_probability(self, el1, el2):
         """
@@ -158,12 +154,14 @@ class OptimizerCache:
         :param el2: name of second element
         :return: total probability of substitution between two elements
         """
-        sp = SubstitutionProbability()
-        total = 0
-        for o1 in el1.common_oxidation_states:
-            for o2 in el2.common_oxidation_states:
-                total += sp.prob(self.get_ionic_specie(el1, o1), self.get_ionic_specie(el2, o2))
-        return total
+        # sp = SubstitutionProbability()
+        # total = 0
+        # for o1 in el1.common_oxidation_states:
+        #     for o2 in el2.common_oxidation_states:
+        #         total += sp.prob(self.get_ionic_specie(el1, o1), self.get_ionic_specie(el2, o2))
+        # return total
+
+        return mixing_probs.get('-'.join(sorted([el1.name, el2.name])), 0.0)
 
     @staticmethod
     def get_ionic_specie(el, ox):
@@ -187,7 +185,7 @@ class OptimizerCache:
         """
         report = ""
         report += "Mixing pairs considered: {}\n\n".format(
-            ", ".join(["({}, {})".format(e1.get_name(), e2.get_name()) for e1, e2 in self.mixing_pairs]))
+            ", ".join(["({}, {})".format(e1.get_name(), e2.get_name()) for e1, e2, _ in self.mixing_pairs]))
 
         if self.ml_model is None:
             report += "Bond lengths as calculated based on atomic radii:\n"

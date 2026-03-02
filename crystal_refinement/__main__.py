@@ -132,9 +132,11 @@ def main():
         if config is None:
             config = parse_config(config_file)
         # Create and run optimizer object
+        # config.pop("mixing_pairs")
         opt = Optimizer(input_prefix=input_prefix,
                         output_prefix=output_prefix,
                         input_directory=input_directory,
+                        # mixing_pairs=[('Ru', 'Ga')],
                         **config)
         opt.run()
 

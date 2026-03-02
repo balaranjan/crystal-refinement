@@ -107,7 +107,7 @@ class OptimizerIteration:
         """
         return copy.deepcopy(self.ins_file)
 
-    def generate_graph(self, output_file):
+    def generate_graph(self, output_file, selected_only=False):
         """
         Generate a graphviz image of the tree with this node as the root
         :param output_file: the file destination to output the image
@@ -118,10 +118,10 @@ class OptimizerIteration:
         dot.node(node_label, str(self.r1), color="green")
         sorted_leaves = self.get_sorted_leaves()
         for i, child in enumerate(self.children):
-            child._generate_graph(str(random.getrandbits(32)), node_label, dot, sorted_leaves)
+            child._generate_graph(str(random.getrandbits(32)), node_label, dot, sorted_leaves, selected_only=selected_only)
         dot.render(output_file, view=False)
 
-    def _generate_graph(self, node_label, parent_label, dot, sorted_leaves):
+    def _generate_graph(self, node_label, parent_label, dot, sorted_leaves, selected_only):
         """
         Actually do the work to generate the graph. This function is recursive.
         :param node_label: graphviz label for the current node. This is supposed to be unique among the nodes in the
@@ -133,7 +133,7 @@ class OptimizerIteration:
         """
         highlight = False
         for i, child in enumerate(self.children):
-            if child._generate_graph(str(random.getrandbits(32)), node_label, dot, sorted_leaves):
+            if child._generate_graph(str(random.getrandbits(32)), node_label, dot, sorted_leaves, selected_only):
                 highlight = True
         if len(self.children) == 0:
             try:
@@ -147,6 +147,10 @@ class OptimizerIteration:
             color = "green"
         if self.dead_branch:
             color = "red"
+
+        if selected_only and color != "green":
+            return
+
         if len(self.children) == 0 and rank >= 0:
             dot.node(node_label, self.generate_label(rank=rank+1), color=color)
         else:
@@ -310,7 +314,7 @@ class OptimizerIteration:
         """
         rank_label = ""
         if rank is not None:
-            rank_label = "\nrank:{}".format(rank)
+            rank_label = "\nrank: {}".format(rank)
         penalty_report = ""
         if self.n_missing_elements > 0:
             penalty_report += "\nmissing_elements: {}".format(self.n_missing_elements)
@@ -318,8 +322,8 @@ class OptimizerIteration:
             penalty_report += "\nnegative anisotropy: {}".format(self.anisotropy_penalty)
         if len(penalty_report) > 0:
             penalty_report = "\npenalties" + penalty_report
-        return "r1: {}\nbond: {}\nstochiometry: {}{}\noverall:{}{}".format(
-            self.r1, self.bond_score, self.stoich_score, penalty_report, self.get_score(), rank_label)
+        return "r1: {}\nbond: {}\nstochiometry: {}{}\noverall: {}{}".format(
+            round(self.r1, 4), round(self.bond_score, 4), round(self.stoich_score, 4), penalty_report, round(self.get_score(), 4), rank_label)
 
     def get_best(self, criteria="overall_score"):
         """

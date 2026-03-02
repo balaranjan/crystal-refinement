@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 import re, copy
 from collections import defaultdict
-from pymatgen.io.cif import CifParser
 
 
 class Bond:
@@ -117,6 +116,32 @@ def get_nn_bonds_by_site(bonds, shelx_file):
     return nn_bonds_by_site
 
 
+def get_bond_list(text):
+    lines = iter(text.splitlines())
+    
+    # Find the geom_bond loop
+    for line in lines:
+        if 'loop_' in line:
+            headers = []
+            for line in lines:
+                line = line.strip()
+                if line.startswith('_geom_bond'):
+                    headers.append(line)
+                elif headers:  # done reading headers, now read data
+                    bonds = []
+                    idx1 = headers.index('_geom_bond_atom_site_label_1')
+                    idx2 = headers.index('_geom_bond_atom_site_label_2')
+                    idxd = headers.index('_geom_bond_distance')
+                    while line:
+                        parts = line.split()
+                        if len(parts) >= len(headers):
+                            dist = float(re.sub(r'\(.*?\)', '', parts[idxd]))
+                            bonds.append((parts[idx1], parts[idx2], dist))
+                        line = next(lines, '').strip()
+                    return bonds
+    return []
+
+
 def get_bonds(driver, shelx_file):
     """
     Get the bonds defined in the given shelx file
@@ -134,10 +159,6 @@ def get_bonds(driver, shelx_file):
 
     with open(driver.cif_file) as f:
         file_txt = f.read()
-        cif_file = CifParser.from_str(file_txt)
-
-    cif_dict = list(cif_file.as_dict().values())[0]
-    bond_tuples = zip(cif_dict["_geom_bond_atom_site_label_1"], cif_dict["_geom_bond_atom_site_label_2"],
-                      [float(x.replace("(", "").replace(")", "")) for x in cif_dict["_geom_bond_distance"]])
-
+        bond_tuples = get_bond_list(file_txt)
+    
     return list(map(lambda tup: Bond(tup[0], tup[1], tup[2]), bond_tuples))

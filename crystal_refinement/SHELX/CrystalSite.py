@@ -25,7 +25,7 @@ class CrystalSite:
         self.read_line(line_list)
 
     def __str__(self):
-        return f"{self.el_string} {self.element} {self.position} {self.occupancy} {self.displacement}"
+        return f"{self.el_string} {self.site_number} {self.element} {self.occupancy} {self.displacement}"
 
     def read_line(self, line_list):
         """

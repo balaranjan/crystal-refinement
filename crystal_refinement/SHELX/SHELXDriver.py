@@ -115,3 +115,23 @@ class SHELXDriver:
             return False
         return True
 
+    def get_missing_elements(self):
+        available_elements = list(set([site.element for site in self.ins_file.get_all_sites()]))
+        missing_elements = [e for e in self.ins_file.elements if e.index not in available_elements]
+        return missing_elements
+
+    def add_missing_elements(self):
+        lightest_element = min([el.get_element().number for el in self.ins_file.elements])
+        missing_elements = self.get_missing_elements()
+        i_try = 0
+        while len(missing_elements) and i_try < 10:
+            if self.ins_file.q_peaks[0].electron_density > lightest_element:
+                self.ins_file.move_q_to_crystal()
+
+                # switch element to missing
+                sorted_sites = [site for site in self.ins_file.get_all_sites() if site.el_string.startswith("Q")][0]
+                new_site = self.ins_file.get_sites_by_index(sorted_sites.site_number)[0]
+                if len(missing_elements):
+                    new_site.switch_element(missing_elements[0])
+            i_try += 1
+            missing_elements = self.add_missing_elements()
