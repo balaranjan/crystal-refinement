@@ -59,8 +59,8 @@ def identify_sites_by_bond_length(initial, optimizer):
         for bond in sorted(bond_utils.get_bonds(optimizer.driver, new_ins)):
             # Threshold on how short the bonds are
             if bond.length / shortest_possible_bond < 0.75:
-                a1_num = int(re.search('\d+', bond.el1).group(0))
-                a2_num = int(re.search('\d+', bond.el2).group(0))
+                a1_num = int(re.search('\\d+', bond.el1).group(0))
+                a2_num = int(re.search('\\d+', bond.el2).group(0))
                 index_to_remove = max(a1_num, a2_num)
                 for site in new_ins.get_sites_by_index(index_to_remove):
                     sites_to_remove.add(site)
@@ -126,8 +126,8 @@ def try_remove_site(initial, optimizer):
         for bond in bonds:
             ideal_distance = optimizer.cache.get_ideal_bond_length(*bond.get_normalized_element_names())
             distance_ratio = (ideal_distance - bond.length) / ideal_distance
-            a1_num = int(re.search('\d+', bond.el1).group(0))
-            a2_num = int(re.search('\d+', bond.el2).group(0))
+            a1_num = int(re.search('\\d+', bond.el1).group(0))
+            a2_num = int(re.search('\\d+', bond.el2).group(0))
             index_to_remove = max(a1_num, a2_num)
             for site in new_ins.get_sites_by_index(index_to_remove):
                 distance_ratios.append((distance_ratio, site))
@@ -179,20 +179,22 @@ def try_remove_sites_based_on_displacement(initial, optimizer):
                 if std == 0.0: std = 1.0e-3
                 if abs(site_displacement - mean) / std < 2.0:
                     break
-            
+            # print("delete", original_site.get_name())
             site_to_remove = list(new_ins.get_sites_by_index(original_site.site_number))[0]
-
+            
             if site_to_remove != "N":
                 new_ins.remove_site(site_to_remove)
-
+                # print("deleting", original_site.get_name())
                 iteration = optimizer.history.run_iter(new_ins, initial, "Removed {} site due to high displacement".format(original_site.get_name()))
                 # If removing site decreased r1, decreased the displacement, add it to the history
                 if iteration is not None:
                     # new_site = iteration.res_file.get_sites_by_index(original_site.site_number)[0]
-                    if iteration.r1 < prev_iter.r1:
-                        optimizer.history.save(iteration)
-                        if optimizer.log_output:
-                            print("Removed {} site due to high displacement".format(original_site.get_name()))
+                    # print("deleted", original_site.get_name())
+                    # if iteration.r1 < prev_iter.r1:
+                    optimizer.history.save(iteration)
+                    # print("saved del", original_site.get_name())
+                    if optimizer.log_output:
+                        print("Removed {} site due to high displacement".format(original_site.get_name()))
 
     # print(ins_file.filetxt)
 

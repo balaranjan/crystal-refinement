@@ -154,14 +154,16 @@ class Optimizer:
                 self.history = OptimizerHistory(self.driver, self.cache, ins_file, self.score_weighting, self.max_n_leaves)
                 initial_loading_ok = True
             except:
+                print(traceback.format_exc())
                 pass
             i_try += 1
 
         # Optimization
         self.run_step(OptimizerSteps.identify_sites)
-        
-        self.run_step(OptimizerSteps.switch_elements)
         self.run_step(OptimizerSteps.try_remove_sites_based_on_displacement)
+        # exit(0)
+        self.run_step(OptimizerSteps.switch_elements)
+        
         self.history.clean_history()
         self.run_step(OptimizerSteps.change_occupancy)
         self.run_step(OptimizerSteps.try_exti)

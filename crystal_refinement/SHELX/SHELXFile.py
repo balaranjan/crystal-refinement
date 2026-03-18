@@ -51,6 +51,9 @@ class SHELXFile:
     
 
     def add_missing_elements(self):
+
+        if not len(self.q_peaks):
+            return
         
         lightest_element = min([el.get_element().number for el in self.elements])
         missing_elements = self.get_missing_elements()
