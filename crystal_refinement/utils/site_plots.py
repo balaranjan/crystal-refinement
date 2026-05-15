@@ -129,161 +129,6 @@ def get_points_and_labels(point, label, zmin=0.0, zmax=1.0):
     return points, labels
 
 
-def move_atom_inside_cell(points, zmin=0.0, zmax=1.0):
-    added_coords = []
-    labels = []
-
-    for x, y, z, label in points:
-        point = np.array([x, y, z])
-
-        if np.any(point < -zmax-0.1) or np.any(point > (2*zmax)+0.1):
-            continue
-
-        point[point > zmax] -= zmax
-        point[point < zmin] += zmax
-
-        assert np.all(point > zmin-0.1) and np.all(point < zmax+0.1), f"outside {point}, {[float(x), float(y), float(z)]}"
-        
-        if not len(added_coords):
-            _points, _labels = get_points_and_labels(point, label, zmin, zmax)
-            added_coords.extend(_points)
-            labels.extend(_labels)
-        else:
-            if np.all(np.linalg.norm(np.array(added_coords) - point, axis=1) > 0.0):
-                _points, _labels = get_points_and_labels(point, label, zmin, zmax)
-                added_coords.extend(_points)
-                labels.extend(_labels)
-    
-    return [[p, l] for p, l in zip(added_coords, labels)]
-
-
-import numpy as np
-
-
-def translate_points_in_unit_cell(
-    lengths,
-    angles,
-    translation_vector,
-    points,
-    degrees = True):
-    """
-    Translate 3D points within a unit cell by a given translation vector.
-
-    Returns:
-        Translated cartesian coordinates, shape (N, 3)
-    """
-
-    a, b, c = lengths
-    alpha, beta, gamma = angles
-
-    if degrees:
-        alpha, beta, gamma = np.radians([alpha, beta, gamma])
-
-    # Build the fractional -> Cartesian matrix (standard crystallographic convention)
-    cos_a, cos_b, cos_g = np.cos(alpha), np.cos(beta), np.cos(gamma)
-    sin_g = np.sin(gamma)
-
-    vol_factor = np.sqrt(
-        1 - cos_a**2 - cos_b**2 - cos_g**2
-        + 2 * cos_a * cos_b * cos_g
-    )
-
-    M = np.array([
-        [a,          b * cos_g,   c * cos_b],
-        [0,          b * sin_g,   c * (cos_a - cos_b * cos_g) / sin_g],
-        [0,          0,           c * vol_factor / sin_g]
-    ])
-
-    points = np.atleast_2d(points)
-    t = np.array(translation_vector)
-
-    # Convert to Cartesian and translate
-    cartesian = points @ M.T
-    cartesian_translated = cartesian + (M @ t)
-    # M_inv = np.linalg.inv(M)
-    # fractional_translated = cartesian_translated @ M_inv.T
-
-    return cartesian_translated
-
-
-
-def get_site_poly_in_translated_cell(site, lengths, angles, translation_vector, unitcell_hull, 
-                                        supercell_coords, supercell_labels, spheres, mask):
-    translated_box = translate_points_in_unit_cell(lengths, angles, translation_vector, unitcell_hull, degrees=False)
-
-    site_coords_in_supercell = supercell_coords[supercell_labels==site]
-    site_coords_in_translated_box = []
-    hull = ConvexHull(translated_box)
-    vertices = hull.points[hull.vertices]
-
-    for coord in site_coords_in_supercell:
-        _hull = ConvexHull([coord, *translated_box])
-        _vertices = _hull.points[_hull.vertices]
-
-        if len(vertices) != len(_vertices):
-            continue
-
-        if np.allclose(vertices, _vertices):
-            site_coords_in_translated_box.append(coord)
-
-
-    if not len(site_coords_in_translated_box):
-        print(f"No sites in translated cell! {site}, {translation_vector}")
-        return
-    
-    # select the closest site to the unitcell
-    dists = np.linalg.norm(np.array(site_coords_in_translated_box) - spheres[0][0], axis=1)
-    selected_site_coord = site_coords_in_translated_box[0]
-    dists = np.linalg.norm(supercell_coords - selected_site_coord, axis=1)
-    neighbor_inds = np.argsort(dists)[1:21]
-    points_wd = [[supercell_labels[i], dists[i], [], supercell_coords[i]] for i in neighbor_inds]
-    CN = CN_of_site(points_wd)
-
-    radius_b = np.linalg.norm(supercell_coords[neighbor_inds] - selected_site_coord, axis=1).max()
-    center_a0 = spheres[0][0][mask]
-    radius_a0 = spheres[0][1]
-
-    # now search through other sites to find non-overlapping poly
-    best_idx, best_score = None, float('inf')
-    for i, center_b in enumerate(site_coords_in_translated_box):
-        center_b = np.array(center_b)[mask]
-
-        # distance from first sphere in spheres
-        dist_to_a0 = np.linalg.norm(center_b - center_a0)
-        # Surface-to-surface distance (negative = overlap)
-        surface_dist_to_a0 = dist_to_a0 - radius_a0 - radius_b
-
-        # total overlap with all polys in sites in translated box
-        total_overlap = 0.0
-        for center_a, radius_a in spheres:
-            center_a = np.array(center_a)[mask]
-            dist = np.linalg.norm(center_b - center_a)
-            overlap = radius_a + radius_b - dist  # positive = overlap
-            if overlap > 0:
-                total_overlap += overlap
-
-        # weight distance to first sphere + penalize overlap
-        score = surface_dist_to_a0 + total_overlap
-        
-        if score < best_score:
-            best_score = score
-            best_idx = i
-
-    selected_site_coord = site_coords_in_translated_box[best_idx]
-    dists = np.linalg.norm(supercell_coords - selected_site_coord, axis=1)
-    neighbor_inds = np.argsort(dists)[1:31]
-
-    neighbor_coords = supercell_coords[neighbor_inds][:CN]
-    neighbor_labels = supercell_labels[neighbor_inds][:CN]
-    
-    neighbor_coords = np.append(neighbor_coords, [selected_site_coord], axis=0)
-    neighbor_labels = np.append(neighbor_labels, site)
-
-    spheres.append([selected_site_coord, np.linalg.norm(neighbor_coords - selected_site_coord, axis=1).max()])
-
-    return translated_box, [[coord, label] for coord, label in zip(neighbor_coords, neighbor_labels)], spheres
-
-
 def label_position(mesh, selected_axes, offset=0.5):
     """Returns a point slightly to the right of the mesh bounding box."""
 
@@ -303,12 +148,13 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
     cif = Cif(cif_path)
     lengths = cif.unitcell_lengths
     angles = cif.unitcell_angles
+    cif.compute_connections()
 
     supercell_points_z = cif.supercell_points
     unitcell_points_z = cif.unitcell_points_for_plotting
 
-    unitcell_points_z = move_atom_inside_cell(unitcell_points_z)
-    supercell_points_z = move_atom_inside_cell(supercell_points_z, -5.0, 5.0)
+    unitcell_points_z = [[p[:3], p[3]] for p in unitcell_points_z]
+    supercell_points_z = [[p[:3], p[3]] for p in supercell_points_z]
 
     # convert to cartesian coordinates
     supercell_points = []
@@ -344,12 +190,6 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
     sorted_indices = np.argsort(lengths)[::-1]
     largest_indices = sorted_indices[:2]
     mask[largest_indices] = True
-
-    # unit cell min max in viewing axis
-    uca_min, uca_max = unitcell_points[0][0][~mask], unitcell_points[0][0][~mask]
-    for coords, _ in unitcell_points[1:]:
-        uca_min = min(uca_min, coords[~mask].squeeze())
-        uca_max = max(uca_max, coords[~mask].squeeze())
 
     selected_axes = [i for i in range(3) if mask[i]]
     axis_vertical, axis_horizontal = selected_axes
@@ -397,27 +237,49 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
         cylinder = pv.Cylinder(center=(pi+pj)/2, direction=pj-pi, height=np.linalg.norm(pj-pi), radius=0.01, resolution=16)
         plotter.add_mesh(cylinder, color='black')
 
-
-    supercell_coords = np.array([p[0] for p in supercell_points])
-    supercell_labels = np.array([p[1] for p in supercell_points])
-    unitcell_center = np.array(unitcell_hull_cartesian).mean(axis=0)
-    unit_cell_radius = np.linalg.norm(np.array(unitcell_hull_cartesian) - np.array(unitcell_center), axis=1).max()
-
-    spheres = [[unitcell_center, unit_cell_radius]]
     axes = {'x': axis_horizontal, 'y': axis_vertical}
+
+    a, b, c = lengths
+    alpha, beta, gamma = angles
+
+    # Build the fractional -> Cartesian matrix (standard crystallographic convention)
+    cos_a, cos_b, cos_g = np.cos(alpha), np.cos(beta), np.cos(gamma)
+    sin_g = np.sin(gamma)
+
+    vol_factor = np.sqrt(
+        1 - cos_a**2 - cos_b**2 - cos_g**2
+        + 2 * cos_a * cos_b * cos_g
+    )
+
+    M = np.array([
+        [a,          b * cos_g,   c * cos_b],
+        [0,          b * sin_g,   c * (cos_a - cos_b * cos_g) / sin_g],
+        [0,          0,           c * vol_factor / sin_g]
+    ])
+
+    conns = cif.connections
+    print(mask)
     for i, site in enumerate(site_symbol_map.keys(), 1):
+
+        points_wd = conns[site][:21]
+        CN = CN_of_site(points_wd)
+
         row = int(i / ncols)
         col = i % ncols
 
         translation_vector = [0, 0, 0]
         translation_vector[axes['x']] = col
         translation_vector[axes['y']] = -row
+        print(site, CN, translation_vector)
+        t_cart = M @ np.array(translation_vector)
 
-        output = get_site_poly_in_translated_cell(site, lengths, angles, translation_vector, unitcell_hull, supercell_coords, supercell_labels, spheres, mask)
-        if output is not None:
-            _, neighbors, spheres = output
-        else:
-            print(i, site)
+        _neighbors = [[v[-1], v[0]] for v in points_wd[:CN]]
+
+        # translate
+        neighbors = [[np.array(points_wd[0][2])+t_cart, site]]
+        for val in _neighbors:
+            val[0] = np.array(val[0]) + t_cart
+            neighbors.append(val)
 
         for i, (point, label) in enumerate(neighbors, 1):
             element = site_symbol_map.get(label, '?')
