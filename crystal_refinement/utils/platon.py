@@ -241,7 +241,6 @@ def update_cif(cif_text, params):
                 z.update_u(uz)
 
                 result.append(f"{label} {sym} {mult} {letter} {x} {y} {z} {other_data[label][0]} {other_data[label][1]}")
-                print(result[-1])
                 i += 1
             i_end = i
 

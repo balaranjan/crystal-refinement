@@ -8,6 +8,7 @@ from itertools import combinations
 from scipy.spatial import ConvexHull
 from crystal_refinement.utils.composition_utils import element_data
 pv.OFF_SCREEN = True
+import traceback
 
 
 def get_element_color(element):
@@ -47,7 +48,7 @@ def CN_of_site(v, verbose=False):
 
     gaps = np.array([round(distances[i] - distances[i-1], 4) for i in range(1, len(distances))])
     ind_gaps = np.argsort(gaps, stable=True)
-    # print(ind_gaps[::-1])
+
     CN_values = np.array(ind_gaps[::-1]) + 1
     CN_values = CN_values[CN_values >= 4]
     if verbose:
@@ -55,16 +56,6 @@ def CN_of_site(v, verbose=False):
         print(CN_values)
     return CN_values[0]
 
-    # Only consider non-zero gaps, use stable sort to break ties consistently
-    CN_values = np.array(ind_gaps[::-1]) + 1
-    CN_values = CN_values[CN_values >= 4]
-    
-    # Filter out CN values where the gap is effectively zero
-    CN_values = [cn for cn in CN_values if gaps[cn - 1] > 1e-9]
-    
-    if verbose:
-        print(CN_values)
-    return CN_values[0]
 
 def CN_of_site_stable(v, verbose=False):
     """
@@ -258,8 +249,8 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
     ])
 
     conns = cif.connections
-    print(mask)
-    for i, site in enumerate(site_symbol_map.keys(), 1):
+ 
+    for i, site in enumerate(sorted(site_symbol_map.keys()), 1):
 
         points_wd = conns[site][:21]
         CN = CN_of_site(points_wd)
@@ -270,7 +261,7 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
         translation_vector = [0, 0, 0]
         translation_vector[axes['x']] = col
         translation_vector[axes['y']] = -row
-        print(site, CN, translation_vector)
+
         t_cart = M @ np.array(translation_vector)
 
         _neighbors = [[v[-1], v[0]] for v in points_wd[:CN]]
@@ -303,9 +294,15 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
         edges = polyhedron.extract_feature_edges()
         plotter.add_mesh(edges, color="black", line_width=2, opacity=0.7)
 
-        label_coord = point
-        label_coord[axis_horizontal] = points[:, axis_horizontal].max() + 0.5
-        label_coord[axis_vertical] = points[:, axis_vertical].min() - 0.1
+        label_coord = neighbors[0][0].copy() 
+        min_x = np.min(points[:, axis_horizontal])
+        max_x = np.max(points[:, axis_horizontal])
+        min_y = np.min(points[:, axis_vertical])
+        max_y = np.max(points[:, axis_vertical])
+        
+        # Position: Top-Right corner of the bounding box, with small padding
+        label_coord[axis_horizontal] = max_x - (abs(max_x-min_x)*0.5) # 0.2 
+        label_coord[axis_vertical] = max_y + (abs(max_y-min_y)*0.05) # 0.2
 
         plotter.add_point_labels(label_coord, [site],
                                  font_size=fontsize,
@@ -338,10 +335,12 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
         center = anchor_point.copy()
         center[axis_horizontal] -= lengths[axis_horizontal] * 0.3
         center[axis_vertical] -= (lengths[axis_vertical] * 0.5 + i*1.75) 
-        sphere = pv.Sphere(center=center, radius=element_data[element][1]*0.5)
+        sphere = pv.Sphere(center=center, radius=element_data[element][1]*rscale)
         plotter.add_mesh(sphere, color=color, show_scalar_bar=True)
-        center[axis_horizontal] *= 1.6
-        center[axis_vertical] *= 0.95
+        
+        center[axis_horizontal] *= 1.2
+        center[axis_vertical] *= 0.9
+
         plotter.add_point_labels(center, [el],
                                  font_size=fontsize,
                                  text_color="black",
@@ -353,13 +352,14 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
     axis_labels = ['a', 'b', 'c']
     left_top_mid[axis_horizontal] -= lengths[axis_horizontal] * 0.4
     left_top_mid[axis_vertical] -= lengths[axis_vertical] * 0.3
+    
     for i, (color, ax) in enumerate(zip(['red', 'green', 'blue'], [axis_horizontal, axis_vertical, ax_out])):
         direction = np.array([0, 0, 0])
         direction[i] = 1
         arrow = pv.Arrow(start=left_top_mid, direction=direction, scale=2, 
                          tip_length=0.3, tip_radius=0.1, shaft_radius=0.05,)
         plotter.add_mesh(arrow, color=color)
-        plotter.add_point_labels(left_top_mid+(direction*2), [axis_labels[ax]],
+        plotter.add_point_labels(left_top_mid+(direction*2.2), [axis_labels[ax]],
                                     font_size=fontsize,
                                     text_color="black",
                                     bold=False,
@@ -377,7 +377,10 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
     print("Screenshot saved to supercell_pyvista.png")
 
     camera_pos = np.array(camera_pos)
+    
     camera_pos[camera_pos==0] = cam_tilt
+
+    # camera_pos = [100, 0, 0]
     plotter.camera.position = camera_pos
     plotter.reset_camera()
     # plotter.render()
