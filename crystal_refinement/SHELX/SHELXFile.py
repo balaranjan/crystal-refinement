@@ -106,7 +106,7 @@ class SHELXFile:
         self.extra_text_section = 1
         header_keys = ["TITL","CELL","ZERR","LATT","SYMM","SYMM","SYMM","SYMM","SYMM","SFAC","UNIT","TEMP","SIZE"]
         while True:
-            if re.match("^\s*$", line) is None and all([key not in line for key in header_keys]):
+            if re.match(r"^\s*$", line) is None and all([key not in line for key in header_keys]):
                 break
             line = lines[line_idx]
             self.extra_text[self.extra_text_section] += line + "\n"
@@ -118,7 +118,7 @@ class SHELXFile:
         starting_element_keys = ["{}".format(el.get_name()) for el in self.elements]
         while True:
             line = lines[line_idx]
-            if re.match("^\s*$", line) is None:
+            if re.match(r"^\s*$", line) is None:
                 split = line.split()
                 key = split[0]
                 if key == "FVAR":
@@ -160,7 +160,7 @@ class SHELXFile:
         while line_idx < len(lines):
             line = lines[line_idx]
             if "REM R1 =" in line:
-                self.r1 = float(re.search("REM R1 =\s*(\d*\.\d+)", line).group(1))
+                self.r1 = float(re.search(r"REM R1 =\s*(\d*\.\d+)", line).group(1))
             if "WGHT" in line:
                 self.suggested_weight_vals = line.split()[1:]
             self.extra_text[self.extra_text_section] += line + "\n"
@@ -191,6 +191,14 @@ class SHELXFile:
         res += self.crystal_sites_string() + "\n"
         res += self.extra_text[2]
         return res
+
+    def set_cell(self, a, b, c, alpha, beta, gamma):
+
+        cell = self.extra_text[0].splitlines()
+        i_cell = [i for i in range(len(cell)) if cell[i].startswith("CELL")][0]
+
+        cell[i_cell] = f"CELL 0.71073  {a}   {b}   {c}  {alpha} {beta}  {gamma}"
+        self.extra_text[0] = "\n".join(cell)
 
     # various editing methods ...
     def add_command(self, cmd, values=None):

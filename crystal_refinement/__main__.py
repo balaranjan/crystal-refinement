@@ -38,7 +38,6 @@ def parse_config(config_file):
             except ValueError:
                 assert False, bond_length_assert_message
         use_ml_model = config.get("use_ml_model", False)
-        citrination_api_key = config.get("citrination_api_key", None)
 
         # Mixing Pairs Config section
         mixing_pairs = config.get("mixing_pairs", None)
@@ -73,7 +72,6 @@ def parse_config(config_file):
             "bond_lengths": bond_lengths,
             "mixing_pairs": mixing_pairs,
             "use_ml_model": use_ml_model,
-            "citrination_api_key": citrination_api_key,
             "ensure_identified_elements": ensure_identified_elements,
             "r1_similarity_threshold": r1_similarity_threshold,
             "occupancy_threshold": occupancy_threshold,

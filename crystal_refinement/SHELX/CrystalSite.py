@@ -25,7 +25,7 @@ class CrystalSite:
         self.read_line(line_list)
 
     def __str__(self):
-        return f"{self.el_string} {self.site_number} {self.element} {self.occupancy} {self.displacement}"
+        return f"{self.el_string} {self.site_number} {self.element} {self.position} {self.occupancy_prefix} {self.occupancy} {self.displacement}"
 
     def read_line(self, line_list):
         """
@@ -36,7 +36,7 @@ class CrystalSite:
         #  Handle Q peaks:
         if line_list[0][0] == "Q":
             self.el_string = "Q"
-            self.site_number = int(re.search('\d+', line_list[0]).group(0))
+            self.site_number = int(re.search(r'\d+', line_list[0]).group(0))
             self.element = int(line_list[1])
             self.position = np.asarray([float(line_list[2]), float(line_list[3]), float(line_list[4])])
             self.occupancy_prefix = int(line_list[5][0])
@@ -46,8 +46,8 @@ class CrystalSite:
 
         # Handles assigned sites:
         else:
-            self.el_string = re.sub("\d+", "", line_list[0])
-            self.site_number = int(re.search('\d+', line_list[0]).group(0))
+            self.el_string = re.sub(r"\d+", "", line_list[0])
+            self.site_number = int(re.search(r'\d+', line_list[0]).group(0))
             self.element = int(line_list[1])
             self.position = np.asarray([float(line_list[2]), float(line_list[3]), float(line_list[4])])
             self.occupancy_prefix = int(line_list[5][:(line_list[5].index(".") - 1)])

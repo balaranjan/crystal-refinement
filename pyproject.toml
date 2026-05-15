@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crystal_refinement"
+version = "0.1.0"
+description = "Helps automate shelx for single crystal refinement"
+authors = [
+    { name = "jling, eantono", email = "erin@citrine.io" },
+]
+license = "BSD-3-Clause"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "graphviz",
+    "python-docx",
+    "matplotlib",
+    "pandas",
+    "pyvista",
+    "scipy",
+    "cifkit",
+    "spglib",
+    "uncertainties",
+    "pandoc",
+]
+
+[project.urls]
+Homepage = "https://citrine.io"
+
+[project.scripts]
+crystal_refinement = "crystal_refinement.__main__:main"
+crystal_report = "crystal_refinement.utils.crystallographic_report:cli_create_word_table"
+plot_supercell = "crystal_refinement.utils.site_plots:cli_plot_supercell_pyvista"
+standardize = "crystal_refinement.utils.platon:cli_standardize"
+
+[tool.setuptools.packages.find]
+include = ["crystal_refinement*"]
