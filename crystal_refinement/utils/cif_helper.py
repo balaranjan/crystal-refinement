@@ -1,4 +1,4 @@
-from crystal_refinement.utils.crystallography_helper import CFloat
+from crystal_refinement.utils.cfloat import CFloat
 from collections import defaultdict
 import math
 import re

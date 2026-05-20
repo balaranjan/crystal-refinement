@@ -17,6 +17,7 @@ import argparse
 from crystal_refinement.utils.cif_helper import *
 from crystal_refinement.utils.crystallography_helper import *
 from crystal_refinement.utils.space_groups import *
+from crystal_refinement.utils.composition_utils import Composition
 
 
 
@@ -188,6 +189,21 @@ def create_word_table(refinement_data):
     }
 
     sample_name = data.get('Formula', 'Unknown Sample')
+    if sample_name != 'Unknown Sample':
+        try:
+            sample_name_dict = Composition(sample_name).formula_dict
+            sample_name_formatted = []
+            if sample_name_dict:
+                for k, v in sample_name_dict.items():
+                    sample_name_formatted.append((k, ''))
+                    if v == 1:
+                        pass
+                    elif abs(int(v) - v) == 0.0:
+                        sample_name_formatted.append((f'{int(v)}', 'sub'))
+                    else:
+                        sample_name_formatted.append((f'{float(v):.2f}', 'sub'))
+        except:
+            sample_name_formatted = (sample_name, '')
 
     # Create document
     doc = Document()
@@ -198,7 +214,8 @@ def create_word_table(refinement_data):
         section.left_margin = Inches(1.4)
 
     doc.add_heading("", level=1)
-    doc.add_paragraph(f"Table #. Crystallographic data from {sample_name}")
+    p = doc.add_paragraph()
+    add_mixed_text(p, [('Table #.', 'bold'), (' Crystallographic data for ', ''), *sample_name_formatted])
 
     for k in set(param_map.keys()) - set(params):
         data.pop(param_map[k])
@@ -244,7 +261,7 @@ def create_word_table(refinement_data):
         
         if key == "Formula":
             cell_para = row.cells[1].paragraphs[0]
-            add_mixed_text(cell_para, [[str(value), 'bold']])
+            add_mixed_text(cell_para, [(v[0], f"{v[1]}-bold") for v in sample_name_formatted])
         elif key == "Space group":
             sg = int(value)
             sg_latex = space_groups[sg]
@@ -265,7 +282,9 @@ def create_word_table(refinement_data):
                        (' [', ''), ('w', 'it'), (' -1', 'sup'), (' = ', ''), ('σ', 'it'), ('2', 'sup'), ('(', ''), ('F', 'it'), ('o', 'sup'), (')', ''), ('2', 'sup'), (' + (0.0534', ''), ('P', 'it'), (')', ''), ('2', 'sup'), ('], where ', ''), ('P', 'it'), (' = ', ''), ('(', ''), ('F', 'it'), ('o', 'sub'), ('2', 'sup'), ('+2', ''), ('F', 'it'), ('c', 'sub'), ('2', 'sup'), (')/3', '')], clear=False)
 
     # Site table
-    doc.add_paragraph(f"\nTable #. Atomic Coordinates and Equivalent Isotropic Displacement Parameters of {sample_name}")
+    # doc.add_paragraph(f"\nTable #. Atomic Coordinates and Equivalent Isotropic Displacement Parameters of {sample_name}")
+    p = doc.add_paragraph()
+    add_mixed_text(p, [('Table #.', 'bold'), (' Atomic Coordinates and Equivalent Isotropic Displacement Parameters of ', ''), *sample_name_formatted])
     
     # sites, _ = get_wyckoff_symbol(refinement_data)
     sites = add_cifkit_labels(refinement_data)
@@ -341,7 +360,7 @@ def create_word_table(refinement_data):
     # Coord table
     # doc.add_paragraph(f"\nTable #. Coordination Environments in {sample_name}")
     p = doc.add_paragraph()
-    add_mixed_text(p, [('Table #.Interatomic distances (', ''), ('d', 'it'), (', Å', ''), (')', ''), (', Δ values (Δ = 100(', ''), ('d', 'it'), ('Σ-', ''), ('r', 'it'), (')', ''), ('/Σ', ''), ('r', 'it'), (' is the sum of the respective atomic radii', ''), (' and atomic coordination numbers (CN) for ', ''), (f'{sample_name}.', '')])
+    add_mixed_text(p, [('Table #.', 'bold'), (' Interatomic distances (', ''), ('d', 'it'), (', Å', ''), (')', ''), (', Δ values (Δ = 100(', ''), ('d', 'it'), ('Σ-', ''), ('r', 'it'), (')', ''), ('/Σ', ''), ('r', 'it'), (' is the sum of the respective atomic radii', ''), (' and atomic coordination numbers (CN) for ', ''), *sample_name_formatted])
     table = doc.add_table(rows=total_entries + 1, cols=5)
     table.style = 'Table Grid'
     table.autofit = True

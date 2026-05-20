@@ -3,12 +3,16 @@ import argparse
 from cifkit import Cif
 from cifkit.utils import unit
 import numpy as np
+import pandas as pd
 import pyvista as pv
 from itertools import combinations
 from scipy.spatial import ConvexHull
 from crystal_refinement.utils.composition_utils import element_data
+from crystal_refinement.utils.cfloat import CFloat
+from matplotlib.colors import ListedColormap
 pv.OFF_SCREEN = True
 import traceback
+import ast
 
 
 def get_element_color(element):
@@ -36,7 +40,7 @@ def get_element_color(element):
         return "green"
 
 
-def CN_of_site(v, verbose=False):
+def CN_of_site(v, full=False, verbose=False):
     
     # Finds the coordination numbers using the d/d_min method.
     points_wd =[[p[3], p[1], p[0]] for p in v]
@@ -54,6 +58,8 @@ def CN_of_site(v, verbose=False):
     if verbose:
         print(gaps[ind_gaps[::-1]])
         print(CN_values)
+
+    if full: return CN_values
     return CN_values[0]
 
 
@@ -134,8 +140,112 @@ def label_position(mesh, selected_axes, offset=0.5):
     return (xmax + offset, center_y - 0, center_z)
 
 
-def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=50, cam_tilt=5,
-                           width=5000, height=3000):
+def get_mixing_data(atom_site_info):
+    label_mix_map = {}
+    loop_vals = [[], [], [], [], [], [], [], []]
+    for k, v in atom_site_info.items():
+        loop_vals[0].append(k)
+        loop_vals[1].append(v['element'])
+        loop_vals[2].append(v['symmetry_multiplicity'])
+        loop_vals[3].append(v['wyckoff_symbol'])
+        loop_vals[4].append(v['x_frac_coord'])
+        loop_vals[5].append(v['y_frac_coord'])
+        loop_vals[6].append(v['z_frac_coord'])
+        loop_vals[7].append(v['site_occupancy'])
+
+    sites = {}
+    all_coords = [] 
+
+    for i in range(len(loop_vals[0])):
+        all_coords.append([CFloat(loop_vals[j][i]).n for j in range(4, 7)])
+    all_coords = np.array(all_coords)
+
+    num_sites = all_coords.shape[0]
+    for i in range(num_sites):
+        ind_same_coord = (np.linalg.norm(all_coords - all_coords[i, :], axis=1) == 0).astype(int)
+        
+        if sum(ind_same_coord) == 1:
+            if float(loop_vals[-1][i]) == 1.0:
+                sites[loop_vals[0][i]] = [loop_vals[j][i] for j in range(1, len(loop_vals))]
+            else:
+                site_name = loop_vals[0][i]
+                label_mix_map[site_name] = site_name
+                val = [[loop_vals[1][i], 'Vac'],
+                       loop_vals[2][i],
+                       loop_vals[3][i],
+                       loop_vals[4][i], loop_vals[5][i], loop_vals[6][i],
+                       [loop_vals[7][i], 1.0-loop_vals[7][i]]
+                       ]
+                sites[site_name] = val
+        else:
+            site_names = [loop_vals[0][j] for j in range(num_sites) if ind_same_coord[j]]
+            site_name = '/'.join(site_names)
+            # label_mix_map[site_name] = [_site_name for _site_name in site_names]
+            for label in site_names:
+                label_mix_map[label] = site_name
+
+            if not site_name in sites:
+                val = [[loop_vals[1][j] for j in range(num_sites) if ind_same_coord[j]],
+                       loop_vals[2][i],
+                       loop_vals[3][i],
+                       loop_vals[4][i], loop_vals[5][i], loop_vals[6][i],
+                       [loop_vals[7][j] for j in range(num_sites) if ind_same_coord[j]]
+                       ]
+                sites[site_name] = val
+
+    # for i in range(num_sites):
+    #     if loop_vals[0][i] not in label_mix_map and float(loop_vals[-1][i]) < 1.0:
+    #         label_mix_map
+
+    return sites, label_mix_map
+
+
+def get_colors_for_disorder(sphere, point, mask, colors_fractions, axis_vertical):
+
+    colors_fractions = sorted(colors_fractions, key=lambda x: x[-1], reverse=True)
+    
+    pts = sphere.points - np.array(point)
+    view_dir = (~mask).astype(float)
+    
+    # Define 12 o'clock as world Z projected onto screen plane
+    world_up = np.array([0, 0, 0])
+    world_up[axis_vertical] = 1
+    
+    # 12 o'clock axis: project world_up onto plane perpendicular to view_dir
+    up_screen = world_up - np.dot(world_up, view_dir) * view_dir
+    up_screen /= np.linalg.norm(up_screen)  # points to 12 o'clock
+
+    # 3 o'clock axis: perpendicular to both view_dir and up_screen
+    right_screen = np.cross(up_screen, view_dir)
+    right_screen /= np.linalg.norm(right_screen)  # points to 3 o'clock
+
+    # Project points onto screen plane
+    u = pts @ right_screen  # horizontal (3 o'clock = positive)
+    v = pts @ up_screen     # vertical   (12 o'clock = positive)
+
+    # Angle from 12 o'clock, clockwise
+    angles = (np.degrees(np.arctan2(u, v))) % 360
+
+    # Assign wedges
+    colors_array = np.zeros(sphere.n_points, dtype=int)
+    cumulative = 0.0
+    for i, (_, fraction) in enumerate(colors_fractions):
+        start_angle = cumulative * 360
+        end_angle   = (cumulative + fraction) * 360
+        if i == len(colors_fractions) - 1:
+            mask = angles >= start_angle
+        else:
+            mask = (angles >= start_angle) & (angles < end_angle)
+        colors_array[mask] = i
+        cumulative += fraction
+    
+    return colors_array
+
+
+def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist=50, cam_tilt=5,
+                           width=10000, height=10000, ambient=0.4, diffuse=0.9,
+                           theta_resolution=100, phi_resolution=100, manual_cam_pos=None):
+
     cif = Cif(cif_path)
     lengths = cif.unitcell_lengths
     angles = cif.unitcell_angles
@@ -167,11 +277,25 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
 
     loop_vals = cif._loop_values
     site_symbol_map = dict(zip([l for l in loop_vals[0]], [s for s in loop_vals[1]]))
+
+    site_data, label_mix_map = get_mixing_data(cif.atom_site_info)
     
     # Trigger connections computation (lazy property)
     _ = cif.shortest_distance
 
+    if os.path.isfile("CN.txt"):
+        user_prefs = pd.read_csv("CN.txt")
+        selected_CNs = dict(zip(user_prefs['Site'].tolist(), user_prefs['CN'].tolist()))
+        print(f"CN values from CN.txt will be used for sites lited in CN.txt")
+
     colors = {el: get_element_color(el) for el in set(list(site_symbol_map.values()))}
+    colors['Vac'] = 'white'
+    if os.path.isfile("colors.txt"):
+        user_prefs = pd.read_csv("colors.txt")
+        slected_colors = dict(zip(user_prefs['Site'].tolist(), user_prefs['Color'].tolist()))
+        for k in colors:
+            if k in slected_colors:
+                colors[k] = slected_colors[k]
     
     plotter = pv.Plotter(window_size=(width, height))
 
@@ -199,10 +323,31 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
 
     # Plot each atom as a sphere
     for point, label in unitcell_points:
-        element = site_symbol_map.get(label, '?')
-        color = colors.get(element, 'black')
-        sphere = pv.Sphere(center=point, radius=element_data[element][1]*rscale)
-        plotter.add_mesh(sphere, color=color, show_scalar_bar=True)
+        
+        if label in label_mix_map:
+            mlabel = label_mix_map[label]
+            msite = site_data[mlabel]
+            colors_fractions = [(elem, occ) for elem, occ in zip(msite[0], msite[-1])]
+            colors_fractions = sorted(colors_fractions, key=lambda x: element_data[x[0]][0], reverse=True)
+            colors_fractions = [(colors.get(v[0], 'black'), v[1]) for v in colors_fractions]
+
+            element = msite[0][0]
+            if msite[-1][0] < msite[-1][1]:
+                element = msite[0][1]
+
+            sphere = pv.Sphere(center=point, radius=element_data[element][1]*rscale, theta_resolution=theta_resolution, 
+                               phi_resolution=phi_resolution)
+            colors_array = get_colors_for_disorder(sphere, point, mask, colors_fractions, axis_vertical)
+            sphere["region"] = colors_array.astype(float)
+            cmap = ListedColormap([c for c, _ in colors_fractions])
+            plotter.add_mesh(sphere, scalars="region", cmap=cmap,
+                        clim=[0, len(colors_fractions) - 1],
+                        show_scalar_bar=False, smooth_shading=True, ambient=ambient, diffuse=diffuse)
+        else:
+            element = site_symbol_map.get(label, '?')
+            color = colors.get(element, 'black')
+            sphere = pv.Sphere(center=point, radius=element_data[element][1]*rscale)
+            plotter.add_mesh(sphere, color=color, show_scalar_bar=True, ambient=ambient, diffuse=diffuse)
 
     # add box
     unitcell_hull = [
@@ -250,10 +395,16 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
 
     conns = cif.connections
  
-    for i, site in enumerate(sorted(site_symbol_map.keys()), 1):
+    for i, site in enumerate(site_data.keys(), 1):
+        site_label = site
+        if site in label_mix_map.values():
+            site = [k for k in label_mix_map.keys() if label_mix_map[k] == site][0]
 
         points_wd = conns[site][:21]
-        CN = CN_of_site(points_wd)
+        if site_label in selected_CNs:
+            CN = selected_CNs[site_label]
+        else:
+            CN = CN_of_site(points_wd)
 
         row = int(i / ncols)
         col = i % ncols
@@ -272,12 +423,34 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
             val[0] = np.array(val[0]) + t_cart
             neighbors.append(val)
 
-        for i, (point, label) in enumerate(neighbors, 1):
-            element = site_symbol_map.get(label, '?')
-            color = colors.get(element, 'black')
+        
+        for point, label in neighbors:
+            if label in label_mix_map:
 
-            sphere = pv.Sphere(center=point, radius=element_data[element][1]*rscale)
-            plotter.add_mesh(sphere, color=color, show_scalar_bar=True)
+                mlabel = label_mix_map[label]
+                msite = site_data[mlabel]
+
+                colors_fractions = [(colors.get(elem, 'black'), occ) for elem, occ in zip(msite[0], msite[-1])]
+
+                elements = msite[0]
+                sphere = pv.Sphere(center=point, radius=element_data[elements[0]][1]*rscale, theta_resolution=theta_resolution, 
+                               phi_resolution=phi_resolution)
+
+                colors_array = get_colors_for_disorder(sphere, point, mask, colors_fractions, axis_vertical)
+                sphere["region"] = colors_array.astype(float)
+                cmap = ListedColormap([c for c, _ in colors_fractions])
+                plotter.add_mesh(sphere, scalars="region", cmap=cmap,
+                            clim=[0, len(colors_fractions) - 1],
+                            show_scalar_bar=False, smooth_shading=True, ambient=ambient, diffuse=diffuse)
+                
+                label = mlabel
+            else:
+                element = site_symbol_map.get(label, '?')
+                color = colors.get(element, 'black')
+
+                sphere = pv.Sphere(center=point, radius=element_data[element][1]*rscale)
+                plotter.add_mesh(sphere, color=color, show_scalar_bar=True, ambient=ambient, diffuse=diffuse)
+
 
         points = np.array([neighbor[0] for neighbor in neighbors])
         hull = ConvexHull(points)
@@ -290,7 +463,16 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
         
         faces = np.concatenate(faces)
         polyhedron = pv.PolyData(points, faces=faces)
-        plotter.add_mesh(polyhedron, color=colors[site_symbol_map[site]], opacity=0.3, show_edges=False)
+
+        if site in label_mix_map:
+            msite = site_data[label_mix_map[site]]
+            element = msite[0][0]
+            if msite[-1][0] < msite[-1][1]:
+                element = msite[0][1]
+        else:
+            element = site_symbol_map[site]
+
+        plotter.add_mesh(polyhedron, color=colors[element], opacity=0.3, show_edges=False, ambient=ambient, diffuse=diffuse)
         edges = polyhedron.extract_feature_edges()
         plotter.add_mesh(edges, color="black", line_width=2, opacity=0.7)
 
@@ -304,7 +486,7 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
         label_coord[axis_horizontal] = max_x - (abs(max_x-min_x)*0.5) # 0.2 
         label_coord[axis_vertical] = max_y + (abs(max_y-min_y)*0.05) # 0.2
 
-        plotter.add_point_labels(label_coord, [site],
+        plotter.add_point_labels(label_coord, [site_label],
                                  font_size=fontsize,
                                  text_color="black",
                                  bold=False,
@@ -332,11 +514,12 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
         left_top_mid[axis_horizontal] = left_bottom_mid[axis_horizontal]
 
     for i, (el, color) in enumerate(colors.items()):
+        if el == 'Vac': continue
         center = anchor_point.copy()
         center[axis_horizontal] -= lengths[axis_horizontal] * 0.3
         center[axis_vertical] -= (lengths[axis_vertical] * 0.5 + i*1.75) 
         sphere = pv.Sphere(center=center, radius=element_data[element][1]*rscale)
-        plotter.add_mesh(sphere, color=color, show_scalar_bar=True)
+        plotter.add_mesh(sphere, color=color, show_scalar_bar=True, ambient=ambient, diffuse=diffuse)
         
         center[axis_horizontal] *= 1.2
         center[axis_vertical] *= 0.9
@@ -372,18 +555,21 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=30, cam_dist=
     plotter.camera.zoom(0.9)
 
     # Save the plot
-    plotter.export_obj('scene.obj')
+    plotter.export_html("scene.html")
     plotter.screenshot('supercell_pyvista.png')
     print("Screenshot saved to supercell_pyvista.png")
 
     camera_pos = np.array(camera_pos)
     
-    camera_pos[camera_pos==0] = cam_tilt
+    if manual_cam_pos is None:
+        camera_pos[camera_pos==0] = cam_tilt
+    else:
+        camera_pos = manual_cam_pos
 
-    # camera_pos = [100, 0, 0]
+    plotter.reset_camera()
     plotter.camera.position = camera_pos
     plotter.reset_camera()
-    # plotter.render()
+    print(f"Tilt position used: {camera_pos}")
     plotter.screenshot('supercell_pyvista_tilt.png')
     print("Screenshot saved to supercell_pyvista_tilt.png")
     plotter.close()
@@ -396,11 +582,12 @@ def cli_plot_supercell_pyvista():
     parser.add_argument("cif_path", help="Path to the CIF file")
     parser.add_argument("--ncols", type=int, default=2, help="Number of columns in the plot grid")
     parser.add_argument("--rscale", type=float, default=0.3, help="Scale factor for atom radii")
-    parser.add_argument("--fontsize", type=int, default=30, help="Font size for labels")
-    parser.add_argument("--cam_dist", type=float, default=50, help="Camera distance from origin")
-    parser.add_argument("--cam_tilt", type=float, default=5, help="Camera tilt angle")
-    parser.add_argument("--width", type=int, default=5000, help="Image width in pixels")
-    parser.add_argument("--height", type=int, default=3000, help="Image height in pixels")
+    parser.add_argument("--fontsize", type=int, default=100, help="Font size for labels")
+    parser.add_argument("--cam-dist", type=float, default=50, help="Camera distance from origin")
+    parser.add_argument("--cam-tilt", type=float, default=5, help="Camera tilt angle")
+    parser.add_argument("--width", type=int, default=8000, help="Image width in pixels")
+    parser.add_argument("--height", type=int, default=8000, help="Image height in pixels")
+    parser.add_argument("--cam-pos", type=lambda s: ast.literal_eval(s), default=None, help="Camera position e.g. '[100, 5, 5]' for a structure viewed through [001] with small tilt in a and b axis")
     
     args = parser.parse_args()
     
@@ -412,7 +599,8 @@ def cli_plot_supercell_pyvista():
         cam_dist=args.cam_dist,
         cam_tilt=args.cam_tilt,
         width=args.width,
-        height=args.height
+        height=args.height,
+        manual_cam_pos=args.cam_pos
     )
 
 

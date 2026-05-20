@@ -23,16 +23,18 @@ dependencies = [
     "spglib",
     "uncertainties",
     "pandoc",
+    "pyvista[jupyter]",
 ]
 
 [project.urls]
 Homepage = "https://citrine.io"
 
 [project.scripts]
-crystal_refinement = "crystal_refinement.__main__:main"
-crystal_report = "crystal_refinement.utils.crystallographic_report:cli_create_word_table"
-plot_supercell = "crystal_refinement.utils.site_plots:cli_plot_supercell_pyvista"
-standardize = "crystal_refinement.utils.platon:cli_standardize"
+cr-refine = "crystal_refinement.__main__:main"
+cr-report = "crystal_refinement.utils.crystallographic_report:cli_create_word_table"
+cr-plot_sites = "crystal_refinement.utils.site_plots:cli_plot_supercell_pyvista"
+cr-standardize = "crystal_refinement.utils.platon:cli_standardize"
+cr-select_CNs = "crystal_refinement.utils.select_CNs:select_CNs"
 
 [tool.setuptools.packages.find]
 include = ["crystal_refinement*"]
