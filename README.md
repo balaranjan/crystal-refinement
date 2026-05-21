@@ -69,7 +69,6 @@ Generates comprehensive, publication-ready Word documents (`.docx`) from refined
 - **Crystal Data Table:** Formula, space group, unit cell parameters, volume, Z, temperature, density, crystal dimensions, absorption coefficient, theta limits, and data statistics.
 - **Atomic Coordinates Table:** Lists site labels, Wyckoff positions, fractional coordinates (x, y, z), occupancy, and equivalent isotropic displacement parameters ($U_{eq}$).
 - **Coordination Environment Table:** Displays interatomic distances ($d$), coordination numbers (CN), and deviation values ($\Delta$) based on atomic radii. Neighbors outside the defined CN are highlighted in grey.
-- **Formatting:** Supports complex LaTeX-to-OMML conversion for space groups and proper subscript/superscript formatting for chemical formulas and physical constants (e.g., $R_1$, $wR_2$, $\mu$, $\Delta\rho$).
 
 - **Usage:**
   ```bash
@@ -79,7 +78,7 @@ Generates comprehensive, publication-ready Word documents (`.docx`) from refined
 ## 4. Site Plots & Supercell Visualization (`cr-plot_sites`)
 Creates high-resolution PNG images of crystal structures using PyVista. This tool visualizes:
 
-- **Supercell Representation:** Displays a $2 \times 2$ grid of unit cells to show connectivity and coordination environments clearly.
+- **Supercell Representation:** Displays a unit cell and shows connectivity and coordination environments of each site clearly.
 - **Disorder Handling:** Automatically detects mixed occupancy sites (disorder) and renders atoms with split spheres proportional to their occupancies, colored by element type.
 - **Coordination Polyhedra:** Draws convex hulls around central atoms based on their coordination number, highlighting nearest neighbors.
 - **Customization:** Allows user-defined camera positions, tilt angles, atom scaling factors, and font sizes. Supports user-defined colors and CN preferences via external text files (`colors.txt`, `CN.txt`).
