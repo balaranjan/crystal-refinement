@@ -196,7 +196,30 @@ def try_remove_sites_based_on_displacement(initial, optimizer):
                     if optimizer.log_output:
                         print("Removed {} site due to high displacement".format(original_site.get_name()))
 
-    # print(ins_file.filetxt)
+
+def refine_with_stidy(self):
+    from crystal_refinement.utils.platon import run_platon, run_stidy, extract_platon_data
+
+    cif_path = "test.cif"
+    run_platon("platon", cif_path)
+    data = run_stidy('platon', cif_path)
+    data = extract_platon_data(data)
+
+    ins_file = self.history.get_best_history()[-1].ins_file
+    new_ins = ins_file.copy()
+    new_ins.set_cell(**{k: data[k] for k in ['a', 'b', 'c', 'alpha', 'beta', 'gamma']})
+    
+
+    # order stidy sites
+    site_data = sorted(data['site_data'], key=lambda s: s[-1])
+
+    for site in new_ins._crystal_sites:
+        site.set_position(np.array(site_data[site.site_number-1][2:5]))
+
+    self.driver.run_SHELXTL(new_ins, cmd='xl')
+
+    
+
 
 
 def switch_elements(initial, optimizer):

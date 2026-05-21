@@ -161,6 +161,7 @@ class Optimizer:
         # Optimization
         self.run_step(OptimizerSteps.identify_sites)
         self.run_step(OptimizerSteps.try_remove_sites_based_on_displacement)
+        # OptimizerSteps.refine_with_stidy(self)
         # exit(0)
         self.run_step(OptimizerSteps.switch_elements)
         
@@ -178,8 +179,9 @@ class Optimizer:
             self.history.clean_history(1, pre_weight_leaf)
 
         self.history.clean_history(criteria=["overall_score", "r1_only"])
-
-        self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
+        
+        # saves the best str
+        self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file, cmd='xl')
         
         results_path = os.path.join(self.input_directory, "optimizer_results")
         if not os.path.exists(results_path):
@@ -199,6 +201,9 @@ class Optimizer:
         for i in range(0, min(self.n_results, len(self.history.get_leaves()))):
             with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
                 f.write(sorted_leaves[i].res_file.filetxt)
+
+        # run STIDY on best solution
+        OptimizerSteps.refine_with_stidy(self)
 
     def run_step(self, step):
         """

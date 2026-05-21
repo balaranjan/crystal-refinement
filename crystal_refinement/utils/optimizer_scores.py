@@ -105,17 +105,8 @@ def get_overall_score(r1_score, bond_score, missing_elements_score, stoich_score
     stoich_score_basis = 0.1
     anisotropy_penalty_basis = 0.1
 
-    # return math.pow(self.r1, self.score_weighting) + math.pow(self.bond_score, 1 - self.score_weighting)
-    # return (1.0 + math.pow(self.r1 / r1_basis, self.score_weighting)) \
-    #        * (1.0 + math.pow(self.bond_score / bond_score_basis, 1 - self.score_weighting))
-    # try:
     return math.pow(r1_score, score_weighting) * \
            math.pow(bond_score + bond_score_basis, 1 - score_weighting) + \
            missing_elements_basis * missing_elements_score ** 2 + \
            stoich_score_basis * stoich_score + \
            anisotropy_penalty_basis * anisotropy_penalty
-    # except TypeError:
-    #     print(self.r1, self.score_weighting, self.bond_score, self.n_missing_elements)
-    #     quit()
-    # return self.r1 * self.bond_score
-    # return (self.r1, len(self.res_file.mixed_site_numbers))

@@ -85,6 +85,7 @@ class Element:
 
 
 element_data = {
+'Vac': [0, 0.0],
 'H': [1, 0.25],
 'He': [2, None],
 'Li': [3, 1.45],
