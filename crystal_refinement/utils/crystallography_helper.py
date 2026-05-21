@@ -9,6 +9,7 @@ from cifkit import Cif
 from cifkit.utils import unit
 from fractions import Fraction
 from crystal_refinement.utils.cfloat import CFloat
+import os
 
 
 
@@ -19,8 +20,6 @@ def fractional_to_cartesian(
 ) -> list[float]:
     """Convert fractional coordinates to Cartesian coordinates using
     cell lengths and angles."""
-
-    
 
     alpha, beta, gamma = cell_angles_rad
     alpha *= np.pi/180.0
@@ -92,78 +91,8 @@ def add_cifkit_labels(data):
                     v['cifk_label'] = clabel
                     site_data[k] = v
                     break  
-                # else:
-                #     print(k, clabel, [v['x'][0], v['y'][0], v['z'][0]], [x, y, z])
 
     return list(site_data.values())
-
-
-# def get_wyckoff_symbol(data):
-
-#     cif = Cif(data['cif_path'])
-#     unitcell_points = cif.unitcell_points
-#     loop_vals = cif._loop_values
-#     site_symbol_map = dict(zip([l for l in loop_vals[0]], [s for s in loop_vals[1]]))
-
-#     site_data = data['site_data']
-#     print(site_data)
-#     site_data = {s['label']: s for s in site_data}
-
-#     # match
-#     for clabel in site_symbol_map.keys():
-#         for k, v in site_data.items():
-#             for x, y, z, cl in unitcell_points:
-#                 if cl != clabel or site_symbol_map[cl] != v['symbol']:
-#                     continue
-
-#                 if np.allclose([v['x'][0], v['y'][0], v['z'][0]], [x, y, z]):
-#                     v['cifk_label'] = clabel
-#                     site_data[k] = v
-#                     break    
-
-#     results = []
-#     unitcell_points = sorted(unitcell_points, key=lambda x: x[:-1])
-#     positions = np.array([p[:3] for p in unitcell_points])
-
-
-#     labels = [(s[-1], site_symbol_map[s[-1]]) for s in unitcell_points]
-#     numbers = np.array([gemmi.Element(site_symbol_map[s[-1]]).atomic_number for s in unitcell_points])
-
-#     a, b, c, alpha, beta, gamma = data["_cell_length_a"], data["_cell_length_b"], data["_cell_length_c"],  \
-#         data["_cell_angle_alpha"], data["_cell_angle_beta"], data["_cell_angle_gamma"]
-    
-#     metric_tensor = np.array([
-#     [a, 0, 0],
-#     [b * np.cos(np.radians(gamma)), b * np.sin(np.radians(gamma)), 0],
-#     [
-#         c * np.cos(np.radians(beta)),
-#         c * (np.cos(np.radians(alpha)) - np.cos(np.radians(beta)) * np.cos(np.radians(gamma))) / np.sin(np.radians(gamma)),
-#         0
-#     ]
-#     ])
-#     cz = np.sqrt(c**2 - metric_tensor[2,0]**2 - metric_tensor[2,1]**2)
-#     metric_tensor[2,2] = cz
-
-#     spglib_cell = (metric_tensor, positions, numbers)
-#     dataset = spglib.get_symmetry_dataset(spglib_cell, symprec=1e-2)
-#     print(dataset)
-
-#     wyckoff_letters = dataset.wyckoffs          # list of letters per atom
-#     equiv_atoms     = dataset.equivalent_atoms.squeeze().tolist()  # maps each atom to its representative
-
-#     counted = []
-#     site_data = {v['cifk_label']: v for k, v in site_data.items()}
-#     for i, ((label, symbol), pos) in enumerate(zip(labels, positions)):
-#         if equiv_atoms[i] in counted:
-#             continue
-
-#         site = site_data[label]
-#         site['wyckoff'] = wyckoff_letters[i]
-#         site['multiplicity'] = equiv_atoms.count(equiv_atoms[i])
-#         results.append(site)
-#         counted.append(equiv_atoms[i])
-
-#     return results, metric_tensor
 
 
 def mixing_sites(unitcell_points):
@@ -232,6 +161,13 @@ def get_coordination_data(cif_path, site_data, cell_params, nround=4):
 
     supercell_points_u = np.array(supercell_points_u)
     supercell_points = np.array(supercell_points)
+
+    selected_CNs = None
+    if os.path.isfile("CN.txt"):
+        user_prefs = pd.read_csv("CN.txt")
+        selected_CNs = dict(zip(user_prefs['Site'].tolist(), user_prefs['CN'].tolist()))
+        print(selected_CNs)
+        print(f"CN values from CN.txt will be used for sites lited in CN.txt")
     
     mixing_labels_calcd = []
     for site, neighbors in conns.items():
@@ -241,9 +177,12 @@ def get_coordination_data(cif_path, site_data, cell_params, nround=4):
             mixing_labels_calcd.append(mixing_data[site])
 
         neighbors = sorted(neighbors, key=lambda x: x[1])[:21]
-        # print(f"\n{site}")
-        CN = CN_of_site(neighbors[:21], verbose=False)
-        # print(f"\n{site}", CN, [n[:2] for n in neighbors[:21]])
+        
+        if selected_CNs and site in selected_CNs:
+            CN = selected_CNs[site]
+        else:
+            CN = CN_of_site(neighbors[:21], verbose=False)
+
         site_coord_w_u = supercell_points_u[np.argmin(np.linalg.norm(supercell_points - np.array(neighbors[0][2]), axis=1))]
 
 
@@ -262,7 +201,6 @@ def get_coordination_data(cif_path, site_data, cell_params, nround=4):
             
             delta = "N.A."
             if label in mixing_data:
-                # print(label, mixing_data[label])
                 labels = mixing_data[label].split('/')
                 for _label in labels:
                     r2 = element_data[site_symbol_map[_label]][1]
@@ -296,7 +234,6 @@ def get_coordination_data(cif_path, site_data, cell_params, nround=4):
         )
 
         if mixing_data:
-            # print(*neighbors_table, sep='\n')
             neighbors_table_mix = []
             for d in sorted(list(set([v[1].n for v in neighbors_table]))):
                 same_d = [v for v in neighbors_table if v[1].n == d]

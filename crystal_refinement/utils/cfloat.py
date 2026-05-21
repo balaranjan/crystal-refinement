@@ -77,8 +77,9 @@ class CFloat:
     def __str__(self):
         if self.num_dec:
             val = str(round(self.n, self.num_dec))
-            while len(val.split('.')[1]) < self.num_dec:
-                val += "0"
+            if '.' in val:
+                while len(val.split('.')[1]) < self.num_dec:
+                    val += "0"
         else:
             val = str(int(self.n)) if '/' not in self.raw else str(self.n)
 

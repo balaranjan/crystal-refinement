@@ -75,15 +75,6 @@ def run_stidy(platon_executable, cif_path):
         raise
 
 
-# def clean_fraction(frac, max_denominator=10):
-#     # If the denominator is too complex, convert to float
-#     frac = Fraction(frac)
-#     if frac.numerator == 0:
-#         return 0
-#     if frac.denominator > max_denominator:
-#         return float(frac)
-#     return frac
-
 def extract_platon_data(text):
     """
     Extracts unit cell parameters and site data from Structure Tidy output.
@@ -255,6 +246,11 @@ def update_cif(cif_text, params):
         i += 1
 
     output = result[:i_end]
+    i_aniso = [i for i in range(len(output)) if "atom_site_aniso" in output[i]]
+
+    if len(i_aniso):
+        output = output[:i_aniso[0]-1]
+
     output.append("\n")
     for line in lines[i_end:]:
         if "_refine_diff_density" in line:

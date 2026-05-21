@@ -10,9 +10,9 @@ from scipy.spatial import ConvexHull
 from crystal_refinement.utils.composition_utils import element_data
 from crystal_refinement.utils.cfloat import CFloat
 from matplotlib.colors import ListedColormap
+import ast
 pv.OFF_SCREEN = True
 import traceback
-import ast
 
 
 def get_element_color(element):
@@ -84,8 +84,7 @@ def CN_of_site_stable(v, verbose=False):
     gaps = np.diff(sorted_dists)
     
     # Handle ties: if gap is very small, it's not a real "jump"
-    
-    tolerance = 1e-4  # Adjust based on precision needs
+    tolerance = 1e-4  
     significant_gaps = np.where(gaps > tolerance, gaps, 0)
     
     if verbose:
@@ -193,10 +192,6 @@ def get_mixing_data(atom_site_info):
                        ]
                 sites[site_name] = val
 
-    # for i in range(num_sites):
-    #     if loop_vals[0][i] not in label_mix_map and float(loop_vals[-1][i]) < 1.0:
-    #         label_mix_map
-
     return sites, label_mix_map
 
 
@@ -283,9 +278,11 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist
     # Trigger connections computation (lazy property)
     _ = cif.shortest_distance
 
+    selected_CNs = None
     if os.path.isfile("CN.txt"):
         user_prefs = pd.read_csv("CN.txt")
         selected_CNs = dict(zip(user_prefs['Site'].tolist(), user_prefs['CN'].tolist()))
+        print(selected_CNs)
         print(f"CN values from CN.txt will be used for sites lited in CN.txt")
 
     colors = {el: get_element_color(el) for el in set(list(site_symbol_map.values()))}
@@ -401,7 +398,8 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist
             site = [k for k in label_mix_map.keys() if label_mix_map[k] == site][0]
 
         points_wd = conns[site][:21]
-        if site_label in selected_CNs:
+        
+        if selected_CNs and site_label in selected_CNs:
             CN = selected_CNs[site_label]
         else:
             CN = CN_of_site(points_wd)
@@ -555,7 +553,7 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist
     plotter.camera.zoom(0.9)
 
     # Save the plot
-    plotter.export_html("scene.html")
+    # plotter.export_html("scene.html")
     plotter.screenshot('supercell_pyvista.png')
     print("Screenshot saved to supercell_pyvista.png")
 

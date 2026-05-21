@@ -1,3 +1,11 @@
+import subprocess
+import shutil
+from docx import Document
+from docx.oxml import OxmlElement
+from lxml import etree
+import re
+
+
 space_groups = {
     # Triclinic
     1:   r"$P1$",
@@ -244,14 +252,6 @@ space_groups = {
     230: r"$Ia\bar{3}d$",
 }
 
-
-
-import subprocess
-import shutil
-from docx import Document
-from docx.oxml import OxmlElement
-from lxml import etree
-import re
 
 def latex_to_omml(latex_expr):
     """

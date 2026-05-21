@@ -1,10 +1,7 @@
 # read cif and populate crystallographic data
 from docx import Document
-from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
 import matplotlib.pyplot as plt
 from math import ceil
 import numpy as np
@@ -82,24 +79,24 @@ def format_scientific(value, uncertainty, precision=4):
     return f"{formatted_val}({int(unc_digits)})"
 
 
-def format_coordinate(val, sigma, precision=4):
+# def format_coordinate(val, sigma, precision=4):
 
-    if sigma == 0:
-        if np.isclose(val, 0.5, atol=1e-4): return "1/2"
-        if np.isclose(val, 0.25, atol=1e-4): return "1/4"
-        if np.isclose(val, 0.75, atol=1e-4): return "3/4"
-        if np.isclose(val, 0.2, atol=1e-4): return "1/5"
-        if np.isclose(val, 0.4, atol=1e-4): return "2/5"
-        if np.isclose(val, 0.6, atol=1e-4): return "3/5"
-        if np.isclose(val, 0.8, atol=1e-4): return "4/5"
-        if np.isclose(val, 0.0, atol=1e-4): return "0"
-        if np.isclose(val, 1.0, atol=1e-4): return "1"
-        if np.isclose(val, 0.3333, atol=1e-4): return "1/3"
-        if np.isclose(val, 0.6667, atol=1e-4): return "2/3"
+#     if sigma == 0:
+#         if np.isclose(val, 0.5, atol=1e-4): return "1/2"
+#         if np.isclose(val, 0.25, atol=1e-4): return "1/4"
+#         if np.isclose(val, 0.75, atol=1e-4): return "3/4"
+#         if np.isclose(val, 0.2, atol=1e-4): return "1/5"
+#         if np.isclose(val, 0.4, atol=1e-4): return "2/5"
+#         if np.isclose(val, 0.6, atol=1e-4): return "3/5"
+#         if np.isclose(val, 0.8, atol=1e-4): return "4/5"
+#         if np.isclose(val, 0.0, atol=1e-4): return "0"
+#         if np.isclose(val, 1.0, atol=1e-4): return "1"
+#         if np.isclose(val, 0.3333, atol=1e-4): return "1/3"
+#         if np.isclose(val, 0.6667, atol=1e-4): return "2/3"
 
-        return f"{round(val, precision)}"
+#         return f"{round(val, precision)}"
     
-    return format_scientific(val, sigma, precision=precision)
+#     return format_scientific(val, sigma, precision=precision)
 
 
 def create_word_table(refinement_data):
@@ -154,8 +151,6 @@ def create_word_table(refinement_data):
         "g": "gamma",
     }
 
-    # print(refinement_data.keys())
-    # Data dictionary
     data = {
         "Formula": refinement_data["_chemical_formula_sum"].replace(" ", ""),
         "Formula mass (amu)": refinement_data["_chemical_formula_weight"],
@@ -242,6 +237,7 @@ def create_word_table(refinement_data):
         '2θ limits': [['2', ''], ['θ', 'it'], [' limits', ''], [' (\u00b0)', '']],
         'No. of unique data (Fo² < 0 included)': [['No. of unique data (', ''], ['F', 'it'], ['o', 'sub'], ['2', 'sup'], [' < 0 included)', '']],
         'No. of observed data (Fo² > 2σ(Fo²))': [['No. of observed data (', ''], ['F', 'it'], ['o', 'sub'], ['2', 'sup'], [' > 2', ''], ['σ', 'it'], ['(', ''], ['F', 'it'], ['o', 'sub'], ['2', 'sup'], ['))', '']],
+        
         'Final R1a indices (all data)': [['Final ', ''], ['R', 'it'], ['1', 'sub'], [' ', ''], ['a', 'sup-it'], [' indices (all data)', '']],
         'Weighted wR2b factor (all data)': [['Weighted ', ''], ['wR', 'it'], ['2', 'sub'], ['b', 'sup-it'], [' factor (all data)', '']],
         '(Δρ)max, (Δρ)min (e Å⁻³)': [['(Δ', ''], ['ρ', 'it'], [')max, (Δ', ''], ['ρ', 'it'], [')min (e Å', ''], ['-3', 'sup'], [')', '']]
@@ -255,9 +251,6 @@ def create_word_table(refinement_data):
             add_mixed_text(cell_para, italics_dict.get(key))
         else:
             row.cells[0].paragraphs[0].add_run(key)
-
-        # if f"{key}_us" in refinement_data:
-        #     print(f"{key}_us", refinement_data[f"{key}_us"])
         
         if key == "Formula":
             cell_para = row.cells[1].paragraphs[0]
@@ -276,17 +269,15 @@ def create_word_table(refinement_data):
 
     p = doc.add_paragraph()
     add_mixed_text(p, [['a ', 'sup'], ['R', 'it'], ['1', 'sub'], ['(', ''], ['F', 'it'], [') = Σ||', ''], ['F', 'it'], ['o', 'sub'], ['| – |', ''], ['F', 'it'], ['c', 'sub'], ['|| / Σ|', ''], ['F', 'it'], ['o', 'sub'], ['|', '']])
-    # p = doc.add_paragraph()
+
     add_mixed_text(p, [('\n', ''), ['b ', 'sup'], ['wR', 'it'], ['2', 'sup'], ['(', ''], ['F', 'it'], [') = [', ''], ['S', 'it'], ['[', ''], ['w', 'it'], ['(', ''], ['F', 'it'], ['o', 'sub'], ['2', 'sup'], [' - ', ''], ['F', 'it'], ['c', 'sub'], ['2', 'sup'], [')', ''], ['2', 'sup'], ['/', ''], ['S', 'it'], ['[', ''], ['w', 'it'], ['(', ''], ('F', 'it'), ('o', 'sub'), ('2', 'sup'), (')', ''), ('2', 'sup'), (']]', ''), ('1/2', 'sup'), 
                        
                        (' [', ''), ('w', 'it'), (' -1', 'sup'), (' = ', ''), ('σ', 'it'), ('2', 'sup'), ('(', ''), ('F', 'it'), ('o', 'sup'), (')', ''), ('2', 'sup'), (' + (0.0534', ''), ('P', 'it'), (')', ''), ('2', 'sup'), ('], where ', ''), ('P', 'it'), (' = ', ''), ('(', ''), ('F', 'it'), ('o', 'sub'), ('2', 'sup'), ('+2', ''), ('F', 'it'), ('c', 'sub'), ('2', 'sup'), (')/3', '')], clear=False)
 
-    # Site table
-    # doc.add_paragraph(f"\nTable #. Atomic Coordinates and Equivalent Isotropic Displacement Parameters of {sample_name}")
+    # Sites table
     p = doc.add_paragraph()
     add_mixed_text(p, [('Table #.', 'bold'), (' Atomic Coordinates and Equivalent Isotropic Displacement Parameters of ', ''), *sample_name_formatted])
     
-    # sites, _ = get_wyckoff_symbol(refinement_data)
     sites = add_cifkit_labels(refinement_data)
     
 
@@ -303,17 +294,11 @@ def create_word_table(refinement_data):
         row = table.rows[i + 1]
         row.cells[0].text = site.get('label', '')
         add_mixed_text(row.cells[1].paragraphs[0], [(str(site.get('multiplicity', '')), ''), (site.get('Wyckoff_symbol', ''), 'it')])
-        # row.cells[2].text = f"{format_coordinate(*site.get('x', ''), precision=4)}"
-        # row.cells[3].text = f"{format_coordinate(*site.get('y', ''), precision=4)}"
-        # row.cells[4].text = f"{format_coordinate(*site.get('z', ''), precision=4)}"
         row.cells[2].text = f"{site.get('x', '').tv}"
         row.cells[3].text = f"{site.get('y', '').tv}"
         row.cells[4].text = f"{site.get('z', '').tv}"
         row.cells[5].text = f"{site.get('occupancy', '')}"
         row.cells[6].text = f"{site.get('Uiso', '')}"
-
-        # z = site.get('x', '')
-        # print(z.raw, z.nx, z.tv, z.n, z.num_dec, z.u, z.num_us)
 
     p = doc.add_paragraph()
     add_mixed_text(p, [('a', 'sup'), ('U', 'it'), ('eq', 'sub'), (' is defined as one-third of the trace of the orthogonalized ', ''), ('U', 'it'), ('ij', 'sub-it'), (' tensor.', '')])
@@ -325,7 +310,6 @@ def create_word_table(refinement_data):
     ]
 
     cell_params = [refinement_data[k] for k in cell_param_keys]
-    # sigma_cell_params = [refinement_data[f"{k}_us"] for k in cell_param_keys]
     coord_table = get_coordination_data(refinement_data["cif_path"], sites, cell_params)
 
     
@@ -355,10 +339,8 @@ def create_word_table(refinement_data):
     if len(coord_table_for_writing) % 2 == 1:
         coord_table_for_writing = coord_table_for_writing[:-1]
     total_entries = len(coord_table_for_writing)
-    # split_point = ceil(total_entries / 2)
 
     # Coord table
-    # doc.add_paragraph(f"\nTable #. Coordination Environments in {sample_name}")
     p = doc.add_paragraph()
     add_mixed_text(p, [('Table #.', 'bold'), (' Interatomic distances (', ''), ('d', 'it'), (', Å', ''), (')', ''), (', Δ values (Δ = 100(', ''), ('d', 'it'), ('Σ-', ''), ('r', 'it'), (')', ''), ('/Σ', ''), ('r', 'it'), (' is the sum of the respective atomic radii', ''), (' and atomic coordination numbers (CN) for ', ''), *sample_name_formatted])
     table = doc.add_table(rows=total_entries + 1, cols=5)
@@ -384,7 +366,6 @@ def create_word_table(refinement_data):
         row.cells[0 + col_offset].text = str(entry['atom'])
         row.cells[1 + col_offset].text = str(entry['neigh'])
         if isinstance(entry['d'], list):
-            # val = '/'.join([format_scientific(v, 0, precision=4) for v in entry['d']])
             val = format_scientific(entry['d'][0], 0, precision=4)
         else:
             val = format_scientific(entry['d'], 0, precision=4)
@@ -404,7 +385,6 @@ def create_word_table(refinement_data):
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
                     for run in paragraph.runs:
-                        # run.italic = True
                         run.font.color.rgb = RGBColor(128, 128, 128)
     
     p = doc.add_paragraph()
@@ -433,12 +413,5 @@ def cli_create_word_table():
 
 if __name__ == "__main__":
     cif_path = "/home/bala/Documents/44_shelxl/test_files/4_DyIrSn_done/test.cif"
-    # cif_path = "/home/bala/Documents/44_shelxl/test_files/6_done_cell_moved/test.cif"
-    # cif_path = "1534822.cif"
-    
-    # create_word_table(result)
-    # cif_path = "/home/bala/Documents/data/not_prototype_CIFs/1232634.cif"
     result = extract_cif_data(cif_path)
-
-
     create_word_table(result)
