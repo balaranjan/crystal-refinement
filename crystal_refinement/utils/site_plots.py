@@ -7,7 +7,7 @@ import pandas as pd
 import pyvista as pv
 from itertools import combinations
 from scipy.spatial import ConvexHull
-from crystal_refinement.utils.composition_utils import element_data
+from crystal_refinement.utils.element_data import element_data
 from crystal_refinement.utils.cfloat import CFloat
 from matplotlib.colors import ListedColormap
 import ast
@@ -237,7 +237,7 @@ def get_colors_for_disorder(sphere, point, mask, colors_fractions, axis_vertical
     return colors_array
 
 
-def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist=50, cam_tilt=5,
+def plot_supercell_pyvista(cif_path, no_label=False, ncols=2, rscale=0.3, fontsize=100, cam_dist=50, cam_tilt=5,
                            width=10000, height=10000, ambient=0.4, diffuse=0.9,
                            theta_resolution=100, phi_resolution=100, manual_cam_pos=None):
 
@@ -325,7 +325,7 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist
             mlabel = label_mix_map[label]
             msite = site_data[mlabel]
             colors_fractions = [(elem, occ) for elem, occ in zip(msite[0], msite[-1])]
-            colors_fractions = sorted(colors_fractions, key=lambda x: element_data[x[0]][0], reverse=True)
+            colors_fractions = sorted(colors_fractions, key=lambda x: element_data[x[0]][0])
             colors_fractions = [(colors.get(v[0], 'black'), v[1]) for v in colors_fractions]
 
             element = msite[0][0]
@@ -474,23 +474,24 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist
         edges = polyhedron.extract_feature_edges()
         plotter.add_mesh(edges, color="black", line_width=2, opacity=0.7)
 
-        label_coord = neighbors[0][0].copy() 
-        min_x = np.min(points[:, axis_horizontal])
-        max_x = np.max(points[:, axis_horizontal])
-        min_y = np.min(points[:, axis_vertical])
-        max_y = np.max(points[:, axis_vertical])
-        
-        # Position: Top-Right corner of the bounding box, with small padding
-        label_coord[axis_horizontal] = max_x - (abs(max_x-min_x)*0.5) # 0.2 
-        label_coord[axis_vertical] = max_y + (abs(max_y-min_y)*0.05) # 0.2
+        if not no_label:
+            label_coord = neighbors[0][0].copy() 
+            min_x = np.min(points[:, axis_horizontal])
+            max_x = np.max(points[:, axis_horizontal])
+            min_y = np.min(points[:, axis_vertical])
+            max_y = np.max(points[:, axis_vertical])
+            
+            # Position: Top-Right corner of the bounding box, with small padding
+            label_coord[axis_horizontal] = max_x - (abs(max_x-min_x)*0.9) # 0.2 
+            label_coord[axis_vertical] = max_y + (abs(max_y-min_y)*0.05) # 0.2
 
-        plotter.add_point_labels(label_coord, [site_label],
-                                 font_size=fontsize,
-                                 text_color="black",
-                                 bold=False,
-                                 show_points=False,
-                                 always_visible=True,
-                                 shape=None,)
+            plotter.add_point_labels(label_coord, [site_label],
+                                    font_size=fontsize,
+                                    text_color="black",
+                                    bold=False,
+                                    show_points=False,
+                                    always_visible=True,
+                                    shape=None,)
         # break
         
     # element legends
@@ -511,6 +512,7 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist
         anchor_point = left_bottom_mid
         left_top_mid[axis_horizontal] = left_bottom_mid[axis_horizontal]
 
+    colors = dict(sorted(colors.items(), key=lambda item: element_data[item[0]][2], reverse=True))
     for i, (el, color) in enumerate(colors.items()):
         if el == 'Vac': continue
         center = anchor_point.copy()
@@ -519,16 +521,17 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist
         sphere = pv.Sphere(center=center, radius=element_data[element][1]*rscale)
         plotter.add_mesh(sphere, color=color, show_scalar_bar=True, ambient=ambient, diffuse=diffuse)
         
-        center[axis_horizontal] *= 1.2
-        center[axis_vertical] *= 0.9
+        if not no_label:
+            center[axis_horizontal] *= 1.5
+            center[axis_vertical] *= 0.9
 
-        plotter.add_point_labels(center, [el],
-                                 font_size=fontsize,
-                                 text_color="black",
-                                 bold=False,
-                                 show_points=False,
-                                 always_visible=True,
-                                 shape=None,)
+            plotter.add_point_labels(center, [el],
+                                    font_size=fontsize,
+                                    text_color="black",
+                                    bold=False,
+                                    show_points=False,
+                                    always_visible=True,
+                                    shape=None,)
     
     axis_labels = ['a', 'b', 'c']
     left_top_mid[axis_horizontal] -= lengths[axis_horizontal] * 0.4
@@ -540,22 +543,27 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist
         arrow = pv.Arrow(start=left_top_mid, direction=direction, scale=2, 
                          tip_length=0.3, tip_radius=0.1, shaft_radius=0.05,)
         plotter.add_mesh(arrow, color=color)
-        plotter.add_point_labels(left_top_mid+(direction*2.2), [axis_labels[ax]],
-                                    font_size=fontsize,
-                                    text_color="black",
-                                    bold=False,
-                                    show_points=False,
-                                    always_visible=True,
-                                    shape=None,)
+
+        if not no_label:
+            plotter.add_point_labels(left_top_mid+(direction*2.2), [axis_labels[ax]],
+                                        font_size=fontsize,
+                                        text_color="black",
+                                        bold=False,
+                                        show_points=False,
+                                        always_visible=True,
+                                        shape=None,)
 
 
     plotter.reset_camera(bounds=None)   # auto-fit
     plotter.camera.zoom(0.9)
 
     # Save the plot
-    # plotter.export_html("scene.html")
-    plotter.screenshot('supercell_pyvista.png')
-    print("Screenshot saved to supercell_pyvista.png")
+    filename = f"unitcell_and_sites_plot"
+    if no_label:
+        filename += "_nolabel"
+    plotter.export_html("scene.html")
+    plotter.screenshot(f'{filename}.png')
+    print(f"Screenshot saved to {filename}.png")
 
     camera_pos = np.array(camera_pos)
     
@@ -568,8 +576,9 @@ def plot_supercell_pyvista(cif_path, ncols=2, rscale=0.3, fontsize=100, cam_dist
     plotter.camera.position = camera_pos
     plotter.reset_camera()
     print(f"Tilt position used: {camera_pos}")
-    plotter.screenshot('supercell_pyvista_tilt.png')
-    print("Screenshot saved to supercell_pyvista_tilt.png")
+
+    plotter.screenshot(f'{filename}_tilt.png')
+    print(f"Screenshot saved to {filename}_tilt.png")
     plotter.close()
 
 
@@ -578,6 +587,7 @@ def cli_plot_supercell_pyvista():
     parser = argparse.ArgumentParser(description="Plot crystal structure using PyVista.")
     
     parser.add_argument("cif_path", help="Path to the CIF file")
+    parser.add_argument("--nolabels", action='store_true', help="Generate images without labels")
     parser.add_argument("--ncols", type=int, default=2, help="Number of columns in the plot grid")
     parser.add_argument("--rscale", type=float, default=0.3, help="Scale factor for atom radii")
     parser.add_argument("--fontsize", type=int, default=100, help="Font size for labels")
@@ -591,6 +601,7 @@ def cli_plot_supercell_pyvista():
     
     plot_supercell_pyvista(
         cif_path=args.cif_path,
+        no_label=args.nolabels,
         ncols=args.ncols,
         rscale=args.rscale,
         fontsize=args.fontsize,

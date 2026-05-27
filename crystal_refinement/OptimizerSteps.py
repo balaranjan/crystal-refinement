@@ -198,25 +198,50 @@ def try_remove_sites_based_on_displacement(initial, optimizer):
 
 
 def refine_with_stidy(self):
-    from crystal_refinement.utils.platon import run_platon, run_stidy, extract_platon_data
+    from crystal_refinement.utils.platon import run_platon, run_stidy, extract_platon_data, update_cif
+    from crystal_refinement.SHELX.SHELXFile import SHELXFile
+    import os
+
+    # shutil.copy(f"optimizer_results{os.sep}0.res", "test.ins")
+    # _ = subprocess.check_output("xl")
+    with open(f"optimizer_results{os.sep}0.res", "r") as f:
+        ins_file = SHELXFile(f.read())
+    
+    new_ins = ins_file.copy()
+    new_ins.add_command("ACTA")
+    self.driver.run_SHELXTL(new_ins, cmd='xl')
 
     cif_path = "test.cif"
     run_platon("platon", cif_path)
     data = run_stidy('platon', cif_path)
     data = extract_platon_data(data)
 
-    ins_file = self.history.get_best_history()[-1].ins_file
+    with open(f"optimizer_results{os.sep}0.res", "r") as f:
+        ins_file = SHELXFile(f.read())
     new_ins = ins_file.copy()
+    new_ins.add_command("ACTA")
     new_ins.set_cell(**{k: data[k] for k in ['a', 'b', 'c', 'alpha', 'beta', 'gamma']})
     
 
     # order stidy sites
-    site_data = sorted(data['site_data'], key=lambda s: s[-1])
+    site_data_with_u = sorted(data['site_data'], key=lambda s: s[-1])
+    site_data = []
+    for site in site_data_with_u:
+        site_data.append([site[0], site[1], 
+                          site[2].n, site[3].n, site[4].n, 
+                          site[5],
+                          site[6], site[7]])
 
     for site in new_ins._crystal_sites:
         site.set_position(np.array(site_data[site.site_number-1][2:5]))
 
     self.driver.run_SHELXTL(new_ins, cmd='xl')
+
+    # add wyckoff site
+    with open("test.cif", "r") as f:
+        updated_cif = update_cif(f.read(), data)
+    with open("test.cif", "w") as f:
+        f.write(updated_cif)
 
     
 

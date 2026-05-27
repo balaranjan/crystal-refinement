@@ -3,7 +3,7 @@ import spglib
 import numpy as np
 import pandas as pd
 from crystal_refinement.utils.site_plots import CN_of_site, CN_of_site_stable
-from crystal_refinement.utils.composition_utils import element_data
+from crystal_refinement.utils.element_data import element_data
 from uncertainties import ufloat, umath
 from cifkit import Cif
 from cifkit.utils import unit
@@ -188,7 +188,7 @@ def get_coordination_data(cif_path, site_data, cell_params, nround=4):
 
         neighbors_table = []
         r1 = element_data[site_symbol_map[site]][1]
-        for neighbor in neighbors[:21]:
+        for neighbor in neighbors[:20]:
             label = neighbor[0]
             neighbor_dists = np.linalg.norm(supercell_points - neighbor[3], axis=1).squeeze()
             ind_neighbor_coord_w_u = np.argmin(neighbor_dists)
@@ -216,7 +216,7 @@ def get_coordination_data(cif_path, site_data, cell_params, nround=4):
                 neighbors_table.append({'neigh': label, 'd': dist, 'delta': delta, 'd_num': round(dist.n, nround), 'count': 0, 'CN': CN})
 
 
-        neighbors_table = neighbors_table[:-1]
+        neighbors_table = neighbors_table
         neighbors_table = pd.DataFrame(neighbors_table)
         neighbors_table = (
             neighbors_table.groupby(['d_num', 'neigh'])
@@ -264,5 +264,5 @@ def get_coordination_data(cif_path, site_data, cell_params, nround=4):
         if site in mixing_data:
             site = mixing_data[site]
         table_data.append([site, CN, neighbors_table])
-
+        
     return table_data

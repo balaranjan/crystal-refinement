@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from docx.shared import RGBColor
 from docx.shared import Inches
+import traceback
 
 import math
 import argparse
@@ -15,6 +16,7 @@ from crystal_refinement.utils.cif_helper import *
 from crystal_refinement.utils.crystallography_helper import *
 from crystal_refinement.utils.space_groups import *
 from crystal_refinement.utils.composition_utils import Composition
+from crystal_refinement.utils.element_data import element_data
 
 
 
@@ -77,26 +79,6 @@ def format_scientific(value, uncertainty, precision=4):
     formatted_val = f"{val_num:.{precision}f}"
 
     return f"{formatted_val}({int(unc_digits)})"
-
-
-# def format_coordinate(val, sigma, precision=4):
-
-#     if sigma == 0:
-#         if np.isclose(val, 0.5, atol=1e-4): return "1/2"
-#         if np.isclose(val, 0.25, atol=1e-4): return "1/4"
-#         if np.isclose(val, 0.75, atol=1e-4): return "3/4"
-#         if np.isclose(val, 0.2, atol=1e-4): return "1/5"
-#         if np.isclose(val, 0.4, atol=1e-4): return "2/5"
-#         if np.isclose(val, 0.6, atol=1e-4): return "3/5"
-#         if np.isclose(val, 0.8, atol=1e-4): return "4/5"
-#         if np.isclose(val, 0.0, atol=1e-4): return "0"
-#         if np.isclose(val, 1.0, atol=1e-4): return "1"
-#         if np.isclose(val, 0.3333, atol=1e-4): return "1/3"
-#         if np.isclose(val, 0.6667, atol=1e-4): return "2/3"
-
-#         return f"{round(val, precision)}"
-    
-#     return format_scientific(val, sigma, precision=precision)
 
 
 def create_word_table(refinement_data):
@@ -186,19 +168,26 @@ def create_word_table(refinement_data):
     sample_name = data.get('Formula', 'Unknown Sample')
     if sample_name != 'Unknown Sample':
         try:
-            sample_name_dict = Composition(sample_name).formula_dict
+            sample_name_dict = dict(Composition(sample_name).formula_dict)
+
+            formatted_sample_name = ""
             sample_name_formatted = []
             if sample_name_dict:
                 for k, v in sample_name_dict.items():
                     sample_name_formatted.append((k, ''))
+                    formatted_sample_name += f"{k}"
                     if v == 1:
                         pass
                     elif abs(int(v) - v) == 0.0:
                         sample_name_formatted.append((f'{int(v)}', 'sub'))
+                        formatted_sample_name += f"{int(v)}"
                     else:
                         sample_name_formatted.append((f'{float(v):.2f}', 'sub'))
+                        formatted_sample_name += f"{str(float(v)):.2f}"
+            sample_name = formatted_sample_name
         except:
             sample_name_formatted = (sample_name, '')
+            print(traceback.format_exc())
 
     # Create document
     doc = Document()
@@ -314,25 +303,33 @@ def create_word_table(refinement_data):
 
     
     coord_table_for_writing = []
+    current_env = None
+    csum = 0
+    t = 0
     for ce in coord_table:
         center = ce[0]
         center_cn = ce[1]
-        csum = 0
+
+        if current_env != center:
+            csum = 0
+            t = 0
 
         for i, ne in enumerate(ce[2]):
             row = {'atom': '', 'neigh': ne[0], 'd': ne[1], 'c': ne[2], 'delta': ne[3], 'it': 0}
-            csum += sum(row['c']) if isinstance(row['c'], list) else row['c']
+            csum += row['c'][0] if isinstance(row['c'], list) else row['c']
 
             if i == 0:
                 row['atom'] = center
             elif i == 1:
                 row['atom'] = f"CN {center_cn}"
 
+            if csum == center_cn:
+                if t==0: t = csum
             if csum > center_cn:
                 row['it'] = 1
 
             coord_table_for_writing.append(row)
-        
+            
         row = {'atom': '', 'neigh': '', 'd': '', 'c': '', 'delta': '', 'it': 0}
         coord_table_for_writing.append(row)
 

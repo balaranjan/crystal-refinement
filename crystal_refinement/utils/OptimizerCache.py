@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 import itertools
 from crystal_refinement.SHELX.SHELXElement import Element
-from citrination_client import CitrinationClient
 from crystal_refinement.utils.bond_utils import Bond
 from crystal_refinement.utils.mixing_prob import mixing_probs
 
@@ -20,10 +19,7 @@ class OptimizerCache:
         self.nominal_formula = shelx_file.get_nominal_formula()
 
         # Bond length information
-        if use_ml_model:
-            self.ml_model = CitrinationClient(api_key)
-        else:
-            self.ml_model = None
+        self.ml_model = None
 
         self.bond_lengths = {}
 

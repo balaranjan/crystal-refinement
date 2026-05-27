@@ -170,7 +170,7 @@ class SHELXFile:
             line_idx += 1
 
     def get_element_string(self):
-        res = "SFAC " + " ".join(map(lambda el: el.get_name(), self.elements)) + "\n"
+        res = "\nSFAC " + " ".join(map(lambda el: el.get_name(), self.elements)) + "\n"
         res += "UNIT " + " ".join(map(lambda el: el.nominal_stoichiometry, self.elements)) + "\n"
         return res
 

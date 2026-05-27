@@ -223,7 +223,6 @@ def update_cif(cif_text, params):
 
             # Write new atom site data
             for site in params['site_data']:
-                # print(site)
                 label, wyck_str, x, y, z, occ, sym, _ = site
                 mult, letter = parse_wyckoff(wyck_str)
                 ux, uy, uz = old_pos_unc.get(label, ('', '', ''))
@@ -245,9 +244,8 @@ def update_cif(cif_text, params):
         
         i += 1
 
-    output = result[:i_end]
+    output = result[:i_end+1]
     i_aniso = [i for i in range(len(output)) if "atom_site_aniso" in output[i]]
-
     if len(i_aniso):
         output = output[:i_aniso[0]-1]
 

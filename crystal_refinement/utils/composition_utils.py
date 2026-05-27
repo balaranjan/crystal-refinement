@@ -1,3 +1,4 @@
+from crystal_refinement.utils.element_data import element_data
 from collections import defaultdict
 import re
 
@@ -5,10 +6,14 @@ import re
 class Composition:
     def __init__(self, formula):
         self.formula = formula
-        self.formula_dict = self._parse_formula(self.formula)
+        self.formula_dict = dict(self._parse_formula(self.formula))
+        self.formula_dict = dict(sorted(self.formula_dict.items(), key=lambda item: element_data[item[0]][2]))
 
     def get_atomic_fraction(self, element):
-        return self.formula_dict[element] / sum(self.formula_dict.values())
+        if element in self.formula_dict:
+            return self.formula_dict[element] / sum(self.formula_dict.values())
+        else:
+            return 0.0
     
     def _parse_formula(self, formula: str, strict: bool = True) -> dict[str, float]:
         """Credits: pymatgen team.
@@ -83,106 +88,3 @@ class Element:
         self.number = element_data[self.name][0]
         self.atomic_radius = element_data[self.name][1]
 
-
-element_data = {
-'Vac': [0, 0.0],
-'H': [1, 0.25],
-'He': [2, None],
-'Li': [3, 1.45],
-'Be': [4, 1.05],
-'B': [5, 0.85],
-'C': [6, 0.7],
-'N': [7, 0.65],
-'O': [8, 0.6],
-'F': [9, 0.5],
-'Ne': [10, None],
-'Na': [11, 1.8],
-'Mg': [12, 1.5],
-'Al': [13, 1.25],
-'Si': [14, 1.1],
-'P': [15, 1.0],
-'S': [16, 1.0],
-'Cl': [17, 1.0],
-'Ar': [18, 0.71],
-'K': [19, 2.2],
-'Ca': [20, 1.8],
-'Sc': [21, 1.6],
-'Ti': [22, 1.4],
-'V': [23, 1.35],
-'Cr': [24, 1.4],
-'Mn': [25, 1.4],
-'Fe': [26, 1.4],
-'Co': [27, 1.35],
-'Ni': [28, 1.35],
-'Cu': [29, 1.35],
-'Zn': [30, 1.35],
-'Ga': [31, 1.3],
-'Ge': [32, 1.25],
-'As': [33, 1.15],
-'Se': [34, 1.15],
-'Br': [35, 1.15],
-'Kr': [36, None],
-'Rb': [37, 2.35],
-'Sr': [38, 2.0],
-'Y': [39, 1.8],
-'Zr': [40, 1.55],
-'Nb': [41, 1.45],
-'Mo': [42, 1.45],
-'Tc': [43, 1.35],
-'Ru': [44, 1.3],
-'Rh': [45, 1.35],
-'Pd': [46, 1.4],
-'Ag': [47, 1.6],
-'Cd': [48, 1.55],
-'In': [49, 1.55],
-'Sn': [50, 1.45],
-'Sb': [51, 1.45],
-'Te': [52, 1.4],
-'I': [53, 1.4],
-'Xe': [54, None],
-'Cs': [55, 2.6],
-'Ba': [56, 2.15],
-'La': [57, 1.95],
-'Ce': [58, 1.85],
-'Pr': [59, 1.85],
-'Nd': [60, 1.85],
-'Pm': [61, 1.85],
-'Sm': [62, 1.85],
-'Eu': [63, 1.85],
-'Gd': [64, 1.8],
-'Tb': [65, 1.75],
-'Dy': [66, 1.75],
-'Ho': [67, 1.75],
-'Er': [68, 1.75],
-'Tm': [69, 1.75],
-'Yb': [70, 1.75],
-'Lu': [71, 1.75],
-'Hf': [72, 1.55],
-'Ta': [73, 1.45],
-'W': [74, 1.35],
-'Re': [75, 1.35],
-'Os': [76, 1.3],
-'Ir': [77, 1.35],
-'Pt': [78, 1.35],
-'Au': [79, 1.35],
-'Hg': [80, 1.5],
-'Tl': [81, 1.9],
-'Pb': [82, 1.8],
-'Bi': [83, 1.6],
-'Po': [84, 1.9],
-'At': [85, None],
-'Rn': [86, None],
-'Fr': [87, None],
-'Ra': [88, 2.15],
-'Ac': [89, 1.95],
-'Th': [90, 1.8],
-'Pa': [91, 1.8],
-'U': [92, 1.75],
-'Np': [93, 1.75],
-'Pu': [94, 1.75],
-'Am': [95, 1.75],
-'Cm': [96, None],
-'Bk': [97, None],
-'Cf': [98, None],
-'Es': [99, None],
-}
